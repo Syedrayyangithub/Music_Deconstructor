@@ -1,4 +1,4 @@
-﻿#  Advanced Music Source Separation
+#  Advanced Music Source Separation
 
 ## Overview
 This project uses Facebook's Demucs library to separate music into multiple components: vocals, drums, bass, and other instruments. It supports 4, 6, and 8-component separation with advanced techniques.
@@ -221,3 +221,5 @@ This project uses Demucs library. Please check Demucs license for usage terms.
 **Created by:** Advanced Music Source Separation Project  
 **Version:** 2.0 (Multi-Component Enhanced)  
 **Last Updated:** 2025
+
+# Music_Deconstructor
