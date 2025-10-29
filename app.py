@@ -42,11 +42,13 @@ def process():
     components = int(request.form.get('components'))
     model = request.form.get('model')
     enhance = request.form.get('enhance') == 'on'
+    silence_threshold_db = int(request.form.get('silence_threshold_db', 30)) # Default to 30 if not provided
     
     session['last_file'] = {
         "filename": unique_filename,
         "components": components,
-        "model": model
+        "model": model,
+        "silence_threshold_db": silence_threshold_db # Store in session
     }
 
     # --- THIS IS THE FIX ---
@@ -63,6 +65,7 @@ def process():
                 model=model,
                 components=components,
                 enhance=enhance,
+                silence_threshold_db=silence_threshold_db, # Pass the new parameter
                 progress_callback=lambda line: f"data: {line}\n\n"
             ):
                 if progress_line:

@@ -10,7 +10,7 @@ import soundfile as sf
 import shutil
 import numpy as np
 
-def enhance_audio(input_file, output_file, enhancement_type="vocals"):
+def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_threshold_db: int = 30):
     """
     Enhance audio using librosa for better quality
     
@@ -18,28 +18,32 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals"):
         input_file (str): Path to input audio file
         output_file (str): Path to output enhanced audio file
         enhancement_type (str): Type of enhancement (vocals, drums, bass, other)
+        silence_threshold_db (int): dB threshold for silence trimming.
     """
     try:
         # Load audio file
         y, sr = librosa.load(input_file, sr=None)
+
+        # Trim silence from the beginning and end of ALL stems
+        y_trimmed, index = librosa.effects.trim(y, top_db=silence_threshold_db)
+
+        # If the entire clip is silent, don't create an output file.
+        if y_trimmed.size == 0:
+            print(f"   Skipping empty file: {Path(input_file).name}")
+            return False # Indicate that no file was written
         
         if enhancement_type == "vocals":
             # Enhance vocals: reduce noise, normalize, and boost clarity
-            # Remove silence
-            y_trimmed, _ = librosa.effects.trim(y, top_db=20)
-            
             # Normalize audio
             y_normalized = librosa.util.normalize(y_trimmed)
-            
             # Apply gentle compression to vocals
             y_enhanced = np.tanh(y_normalized * 1.2) * 0.8
-            
             # Boost high frequencies for clarity
             y_enhanced = librosa.effects.preemphasis(y_enhanced, coef=0.97)
             
         elif enhancement_type == "drums":
             # Enhance drums: boost low frequencies, normalize
-            y_normalized = librosa.util.normalize(y)
+            y_normalized = librosa.util.normalize(y_trimmed)
             
             # Boost low frequencies for kick and snare
             y_enhanced = y_normalized * 1.3
@@ -49,7 +53,7 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals"):
             
         elif enhancement_type == "bass":
             # Enhance bass: boost low frequencies, normalize
-            y_normalized = librosa.util.normalize(y)
+            y_normalized = librosa.util.normalize(y_trimmed)
             
             # Boost low frequencies
             y_enhanced = y_normalized * 1.4
@@ -59,7 +63,7 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals"):
             
         else:  # other instruments
             # Enhance other instruments: normalize and boost clarity
-            y_normalized = librosa.util.normalize(y)
+            y_normalized = librosa.util.normalize(y_trimmed)
             
             # Apply gentle enhancement
             y_enhanced = y_normalized * 1.1
@@ -139,7 +143,7 @@ def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_ta
         raise subprocess.CalledProcessError(proc.returncode, command, output=stdout, stderr=stderr)
 
 
-def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs", device="cpu", components=4, enhance=True, progress_callback: Optional[Callable[[str], None]] = None):
+def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs", device="cpu", components=4, enhance=True, silence_threshold_db: int = 30, progress_callback: Optional[Callable[[str], None]] = None):
     """
     Ultra audio separation with multiple component options and enhancement
     
@@ -150,6 +154,7 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
         device (str): Device to use (cpu, cuda, mps)
         components (int): Number of components to separate (4, 6, 8)
         enhance (bool): Whether to enhance audio quality
+        silence_threshold_db (int): dB threshold for silence trimming during enhancement.
     """
     print(f" Starting ULTRA {components}-component separation for: {input_file}")
     print(f" Output directory: {output_dir}")
@@ -175,14 +180,14 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
             return
         
         if components == 4:
-            yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, progress_callback=progress_callback)
+            yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback=progress_callback)
             
         elif components == 6:
-            yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, progress_callback=progress_callback)
+            yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback=progress_callback)
             
         elif components == 8:
             # Note: The model parameter is ignored here as the function uses the best one.
-            yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, progress_callback=progress_callback)
+            yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, progress_callback=progress_callback)
         
         print(" Ultra separation complete!")
         used_model = "htdemucs_ft" if components == 8 else model
@@ -196,14 +201,14 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
     except Exception as e:
         if progress_callback: yield progress_callback(f"ERROR: An unexpected error occurred: {e}")
 
-def _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, progress_callback: Optional[Callable[[str], None]] = None):
+def _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
     """Handles 4-component separation."""
     yield from _run_demucs(venv_python, input_file, output_dir, model, device, progress_callback=progress_callback)
     if enhance:
         print(" Enhancing audio quality...")
-        enhance_4_components(input_file, output_dir, model)
+        enhance_4_components(input_file, output_dir, model, silence_threshold_db)
 
-def _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, progress_callback: Optional[Callable[[str], None]] = None):
+def _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
     """Handles 6-component separation using a two-pass technique."""
     if progress_callback: yield progress_callback("Running 6-component separation (Pass 1/2)...")
     
@@ -226,11 +231,9 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
         
         if enhance:
             if progress_callback: yield progress_callback("Enhancing audio quality...")
-            enhance_6_components(input_file, output_dir) # Enhancement functions don't take progress_callback
+            enhance_6_components(input_file, output_dir, silence_threshold_db) # Enhancement functions don't take progress_callback
 
-def _separate_8_components(venv_python, input_file, output_dir, device, enhance, progress_callback: Optional[Callable[[str], None]] = None):
-    """Handles 8-component separation using a multi-pass technique."""
-    if progress_callback: yield progress_callback("Running 8-component separation...")
+def _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
     
     # For 8-component separation, always use the highest quality model for best results.
     best_model = "htdemucs_ft"
@@ -262,9 +265,9 @@ def _separate_8_components(venv_python, input_file, output_dir, device, enhance,
     create_8_component_structure_direct(track_dir, output_dir, base_name)
     if enhance:
         if progress_callback: yield progress_callback("Enhancing audio quality...")
-        enhance_8_components(input_file, output_dir)
+        enhance_8_components(input_file, output_dir, silence_threshold_db)
 
-def enhance_4_components(input_file, output_dir, model="htdemucs"):
+def enhance_4_components(input_file, output_dir, model="htdemucs", silence_threshold_db: int = 30):
     """Enhance 4-component separation results"""
     base_name = Path(input_file).stem
     track_dir = os.path.join(output_dir, model, base_name)
@@ -277,14 +280,19 @@ def enhance_4_components(input_file, output_dir, model="htdemucs"):
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            enhanced_path = os.path.join(track_dir, f"enhanced_{filename}")
+            # Create a temporary path for the enhanced file
+            temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
-            if enhance_audio(input_path, enhanced_path, enhancement_type):
+            if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
+                os.remove(input_path) # Delete the original file
+                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
             else:
-                print(f"   Failed to enhance {filename}")
-
-def enhance_6_components(input_file, output_dir):
+                print(f"   Skipped empty {filename} (after trimming)")
+                os.remove(input_path) # Delete the original file as it's considered empty
+                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                    os.remove(temp_enhanced_path)
+def enhance_6_components(input_file, output_dir, silence_threshold_db: int = 30):
     """Enhance 6-component separation results"""
     base_name = Path(input_file).stem
     track_dir = os.path.join(output_dir, "6_components", base_name)
@@ -297,14 +305,19 @@ def enhance_6_components(input_file, output_dir):
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            enhanced_path = os.path.join(track_dir, f"enhanced_{filename}")
+            # Create a temporary path for the enhanced file
+            temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
-            if enhance_audio(input_path, enhanced_path, enhancement_type):
+            if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
+                os.remove(input_path) # Delete the original file
+                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
             else:
-                print(f"   Failed to enhance {filename}")
-
-def enhance_8_components(input_file, output_dir):
+                print(f"   Skipped empty {filename} (after trimming)")
+                os.remove(input_path) # Delete the original file as it's considered empty
+                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                    os.remove(temp_enhanced_path)
+def enhance_8_components(input_file, output_dir, silence_threshold_db: int = 30):
     """Enhance 8-component separation results"""
     base_name = Path(input_file).stem
     track_dir = os.path.join(output_dir, "8_components", base_name)
@@ -317,13 +330,18 @@ def enhance_8_components(input_file, output_dir):
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            enhanced_path = os.path.join(track_dir, f"enhanced_{filename}")
+            # Create a temporary path for the enhanced file
+            temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
-            if enhance_audio(input_path, enhanced_path, enhancement_type):
+            if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
+                os.remove(input_path) # Delete the original file
+                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
             else:
-                print(f"   Failed to enhance {filename}")
-
+                print(f"   Skipped empty {filename} (after trimming)")
+                os.remove(input_path) # Delete the original file as it's considered empty
+                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                    os.remove(temp_enhanced_path)
 def create_6_component_structure(track_dir, output_dir, base_name, model="htdemucs"):
     """Create 6-component structure from 4-component separation"""
     # The advanced separation creates a folder named after the input file
@@ -430,15 +448,11 @@ def get_separation_results(input_file, output_dir, components, model):
 def _print_component_info(track_dir, emoji, description, filename):
     """Helper function to print details for a single component."""
     file_path = os.path.join(track_dir, filename)
-    enhanced_path = os.path.join(track_dir, f"enhanced_{filename}")
     
     print(f"{emoji} - {description}")
     if os.path.exists(file_path):
         file_size = os.path.getsize(file_path) / (1024 * 1024)
         print(f"    {filename} ({file_size:.1f} MB)")
-        if os.path.exists(enhanced_path):
-            enhanced_size = os.path.getsize(enhanced_path) / (1024 * 1024)
-            print(f"    enhanced_{filename} ({enhanced_size:.1f} MB)")
     else:
         print(f"    {filename} (File not found)")
 
@@ -514,6 +528,8 @@ def main():
                        default=4, help="Number of components to separate")
     parser.add_argument("--no-enhance", action="store_true", 
                        help="Disable audio enhancement")
+    parser.add_argument("--silence-threshold", type=int, default=30,
+                       help="dB threshold for silence trimming (0-60, default: 30)")
     
     args = parser.parse_args()
     
@@ -523,6 +539,7 @@ def main():
     print(f" Model: {args.model}")
     print(f" Device: {args.device}")
     print(f" Audio Enhancement: {'OFF' if args.no_enhance else 'ON'}")
+    print(f" Silence Trim Threshold: {args.silence_threshold} dB")
     print("=" * 70)
     
     # When run as a script, we iterate through the generator to execute it.
@@ -533,6 +550,7 @@ def main():
         args.device, 
         args.components,
         enhance=not args.no_enhance,
+        silence_threshold_db=args.silence_threshold,
         progress_callback=print # Print progress to console
     ):
         pass

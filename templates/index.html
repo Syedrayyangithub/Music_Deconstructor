@@ -162,14 +162,19 @@
             </div>
 
             <!-- Example snippet for templates/index.html -->
-            <div class="form-group">
-                <label for="enhance-checkbox">Enhance Audio Quality</label>
-                <input type="checkbox" id="enhance-checkbox" name="enhance" checked>
-                <small class="form-text text-muted">
+            <div class="form-group form-check">
+                <input type="checkbox" class="form-check-input" id="enhance-checkbox" name="enhance" checked>
+                <label class="form-check-label" for="enhance-checkbox">Enhance Audio Quality</label>
+                <small class="form-text text-muted d-block">
                 Applies effects like normalization and compression to improve clarity. (Adds processing time)
                 </small>
             </div>
 
+            <div class="form-group">
+                <label for="silence-threshold">Silence Trimming Sensitivity (dB)</label>
+                <input type="number" id="silence-threshold" name="silence_threshold_db" min="0" max="60" value="30" class="form-control">
+                <small class="form-text text-muted">Higher values (e.g., 40-60) trim more aggressively. Lower values (e.g., 10-20) preserve more quiet audio.</small>
+            </div>
 
             
 
