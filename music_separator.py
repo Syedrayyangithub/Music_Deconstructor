@@ -10,6 +10,9 @@ import soundfile as sf
 import shutil
 import numpy as np
 
+# A global dictionary to keep track of active subprocesses by a unique job ID
+ACTIVE_PROCESSES = {}
+
 def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_threshold_db: int = 30):
     """
     Enhance audio using librosa for better quality
@@ -97,7 +100,7 @@ def _get_enhancement_map():
         "cymbals": "drums"
     }
 
-def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_target=None, progress_callback: Optional[Callable[[str], None]] = None):
+def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_target=None, job_id: Optional[str] = None, progress_callback: Optional[Callable[[str], None]] = None):
     """
     Helper function to build and run a Demucs command.
     
@@ -108,6 +111,7 @@ def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_ta
         model (str): The Demucs model to use.
         device (str): The processing device (cpu, cuda).
         two_stems_target (str, optional): The target for a two-stems separation.
+        job_id (str, optional): A unique ID for this job to allow for cancellation.
         progress_callback (Callable, optional): A function to call with each line of progress output.
 
     Returns:
@@ -124,24 +128,35 @@ def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_ta
     
     command.append(input_file)
 
-    print(f" Running Demucs on '{Path(input_file).name}'...")    
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+    print(f" Running Demucs on '{Path(input_file).name}'...")
+    proc = None
+    try:
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        
+        if job_id:
+            ACTIVE_PROCESSES[job_id] = proc
 
-    # Demucs prints its progress bar to stderr
-    if proc.stderr:
-        for line in iter(proc.stderr.readline, ''):
-            line = line.strip()
-            if progress_callback:
-                yield progress_callback(line)
-            else: # Default behavior: print to console if no callback
-                print(line.strip())
-    
-    stdout, stderr = proc.communicate()
+        # Demucs prints its progress bar to stderr
+        if proc.stderr:
+            for line in iter(proc.stderr.readline, ''):
+                line = line.strip()
+                if progress_callback:
+                    yield progress_callback(line)
+                else: # Default behavior: print to console if no callback
+                    print(line.strip())
+        
+        stdout, stderr = proc.communicate()
 
-    if proc.returncode != 0:
-        print(f"Demucs Error: {stderr}")
-        raise subprocess.CalledProcessError(proc.returncode, command, output=stdout, stderr=stderr)
-
+        if proc.returncode != 0 and proc.returncode != -9: # -9 is the exit code when killed
+            print(f"Demucs Error: {stderr}")
+            raise subprocess.CalledProcessError(proc.returncode, command, output=stdout, stderr=stderr)
+    finally:
+        if job_id and job_id in ACTIVE_PROCESSES:
+            # Clean up the process from our tracking dictionary
+            del ACTIVE_PROCESSES[job_id]
+        if proc and proc.poll() is None:
+            # Ensure the process is terminated if the generator is exited early
+            proc.kill()
 
 def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs", device="cpu", components=4, enhance=True, silence_threshold_db: int = 30, progress_callback: Optional[Callable[[str], None]] = None):
     """
@@ -178,16 +193,18 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
         if not os.path.exists(input_file):
             if progress_callback: yield progress_callback(f"ERROR: Input file '{input_file}' not found")
             return
+            
+        job_id = Path(input_file).name # Use the unique filename as the job ID
         
         if components == 4:
-            yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback=progress_callback)
+            yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
             
         elif components == 6:
-            yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback=progress_callback)
+            yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
             
         elif components == 8:
             # Note: The model parameter is ignored here as the function uses the best one.
-            yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, progress_callback=progress_callback)
+            yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
         
         print(" Ultra separation complete!")
         used_model = "htdemucs_ft" if components == 8 else model
@@ -196,24 +213,25 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
     except FileNotFoundError as e:
         if progress_callback: yield progress_callback(f"ERROR: {e}")
     except subprocess.CalledProcessError as e:
-        error_message = f"Demucs processing error: {e.stderr}"
-        if progress_callback: yield progress_callback(f"ERROR: {error_message}")
+        if e.returncode != -9: # Don't show an error if it was cancelled by the user
+            error_message = f"Demucs processing error: {e.stderr}"
+            if progress_callback: yield progress_callback(f"ERROR: {error_message}")
     except Exception as e:
         if progress_callback: yield progress_callback(f"ERROR: An unexpected error occurred: {e}")
 
-def _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
+def _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id: str, progress_callback: Optional[Callable[[str], None]] = None):
     """Handles 4-component separation."""
-    yield from _run_demucs(venv_python, input_file, output_dir, model, device, progress_callback=progress_callback)
+    yield from _run_demucs(venv_python, input_file, output_dir, model, device, job_id=job_id, progress_callback=progress_callback)
     if enhance:
         print(" Enhancing audio quality...")
         enhance_4_components(input_file, output_dir, model, silence_threshold_db)
 
-def _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
+def _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id: str, progress_callback: Optional[Callable[[str], None]] = None):
     """Handles 6-component separation using a two-pass technique."""
     if progress_callback: yield progress_callback("Running 6-component separation (Pass 1/2)...")
     
     # First pass: Standard 4-component separation
-    yield from _run_demucs(venv_python, input_file, output_dir, model, device, progress_callback=progress_callback)
+    yield from _run_demucs(venv_python, input_file, output_dir, model, device, job_id=job_id, progress_callback=progress_callback)
     
     # Second pass: Further separate "other" into piano and guitar
     base_name = Path(input_file).stem
@@ -224,7 +242,7 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
     if os.path.exists(other_file):
         if progress_callback: yield progress_callback("Further separating 'other' component (Pass 2/2)...")
         advanced_output_dir = os.path.join(output_dir, "advanced")
-        yield from _run_demucs(venv_python, other_file, advanced_output_dir, model, device, "other", progress_callback=progress_callback)
+        yield from _run_demucs(venv_python, other_file, advanced_output_dir, model, device, "other", job_id=f"{job_id}-other", progress_callback=progress_callback)
         
         # Organize the final 6-component structure
         create_6_component_structure(track_dir, output_dir, base_name, model)
@@ -233,7 +251,7 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
             if progress_callback: yield progress_callback("Enhancing audio quality...")
             enhance_6_components(input_file, output_dir, silence_threshold_db) # Enhancement functions don't take progress_callback
 
-def _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, progress_callback: Optional[Callable[[str], None]] = None):
+def _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, job_id: str, progress_callback: Optional[Callable[[str], None]] = None):
     
     # For 8-component separation, always use the highest quality model for best results.
     best_model = "htdemucs_ft"
@@ -241,7 +259,7 @@ def _separate_8_components(venv_python, input_file, output_dir, device, enhance,
     
     # First pass: Standard 4-component separation
     print(" Pass 1/2: Standard 4-component separation...")
-    yield from _run_demucs(venv_python, input_file, output_dir, best_model, device, progress_callback=progress_callback)
+    yield from _run_demucs(venv_python, input_file, output_dir, best_model, device, job_id=job_id, progress_callback=progress_callback)
     
     # Second pass: Further separate each component
     base_name = Path(input_file).stem
@@ -260,7 +278,7 @@ def _separate_8_components(venv_python, input_file, output_dir, device, enhance,
     for stem, adv_dir in stems_to_separate.items():
         stem_file = os.path.join(track_dir, f"{stem}.wav")
         if os.path.exists(stem_file):
-            yield from _run_demucs(venv_python, stem_file, os.path.join(output_dir, adv_dir), best_model, device, stem, progress_callback=progress_callback)
+            yield from _run_demucs(venv_python, stem_file, os.path.join(output_dir, adv_dir), best_model, device, stem, job_id=f"{job_id}-{stem}", progress_callback=progress_callback)
 
     create_8_component_structure_direct(track_dir, output_dir, base_name)
     if enhance:

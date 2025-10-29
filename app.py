@@ -1,11 +1,12 @@
 import os
-from flask import Flask, request, render_template, send_from_directory, redirect, url_for, Response, session, current_app
+from flask import Flask, request, render_template, send_from_directory, redirect, url_for, Response, session, current_app, flash
 from werkzeug.utils import secure_filename
 import uuid
 from pathlib import Path
+import shutil
 
 # Import the core separation function from your script
-from music_separator import separate_audio_ultra, get_separation_results
+from music_separator import separate_audio_ultra, get_separation_results, ACTIVE_PROCESSES
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'output_demucs'
@@ -102,6 +103,46 @@ def results_page():
 @app.route('/download/<path:filepath>')
 def download_file(filepath):
     return send_from_directory(current_app.config['OUTPUT_FOLDER'], filepath, as_attachment=True)
+
+@app.route('/clear-files', methods=['POST'])
+def clear_files():
+    """Deletes all files from the upload and output directories."""
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    output_folder = current_app.config['OUTPUT_FOLDER']
+    
+    folders_to_clear = [upload_folder, output_folder]
+    
+    for folder in folders_to_clear:
+        for item in os.listdir(folder):
+            item_path = os.path.join(folder, item)
+            try:
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+            except Exception as e:
+                print(f"Failed to delete {item_path}. Reason: {e}")
+                flash(f"Error deleting some files: {e}", "error")
+
+    session.pop('last_file', None) # Clear session to prevent showing old results
+    flash("All temporary files and outputs have been cleared.", "success")
+    return redirect(url_for('index'))
+
+@app.route('/cancel', methods=['POST'])
+def cancel_process():
+    """Attempts to cancel a running Demucs process."""
+    last_file_info = session.get('last_file')
+    if not last_file_info:
+        return {"status": "error", "message": "No active job found in session."}, 404
+
+    job_id = last_file_info['filename']
+    process_to_kill = ACTIVE_PROCESSES.get(job_id)
+
+    if process_to_kill and process_to_kill.poll() is None: # Check if process exists and is running
+        process_to_kill.kill()
+        return {"status": "success", "message": f"Process {job_id} cancelled."}, 200
+    
+    return {"status": "error", "message": "Process not found or already finished."}, 404
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
