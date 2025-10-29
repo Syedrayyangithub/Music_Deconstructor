@@ -8,12 +8,12 @@ This project uses Facebook's Demucs library to separate music into multiple comp
 ###  Multi-Component Separation
 - **4 Components**: vocals, drums, bass, other
 - **6 Components**: vocals, drums, bass, piano, guitar, other  
-- **8 Components**: Multiple model ensemble separation
+- **8 Components**: vocals, drums, bass, other, lead vocals, harmony, kick/snare, cymbals, piano, guitar
 
 ###  Advanced Features
 - **Multiple Demucs Models**: htdemucs, mdx_extra, htdemucs_ft
 - **Two-Stems Technique**: Further separate "other" into piano and guitar
-- **Multi-Model Ensemble**: Combine different models for better results
+- **Multi-Pass Separation**: Re-processes stems for more granular output (used in 8-component mode)
 - **Professional CLI**: Command-line interface with comprehensive options
 - **Batch Processing**: Process multiple files (coming soon)
 - **Multiple Formats**: MP3, WAV, FLAC, M4A, AAC support

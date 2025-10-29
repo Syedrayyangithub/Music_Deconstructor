@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Deconstructor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #1DB954;
+            --primary-hover: #1ED760;
+            --text-color: #FFFFFF;
+            --text-secondary: #B3B3B3;
+            --border-color: #2c2c2c;
+        }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            line-height: 1.6; 
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            width: 100%;
+            max-width: 650px; 
+            margin: 40px auto; 
+            padding: 40px; 
+            background: var(--surface-color); 
+            border-radius: 16px; 
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        h1 { 
+            color: var(--text-color); 
+            text-align: center; 
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin: 0;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
+        select { 
+            width: 100%; 
+            padding: 12px; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 1rem;
+        }
+        .file-upload-wrapper {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .file-upload-wrapper:hover {
+            border-color: var(--primary-color);
+            background-color: #2a2a2a;
+        }
+        .file-upload-wrapper input[type="file"] { display: none; }
+        .file-upload-icon {
+            stroke: var(--text-secondary);
+            width: 48px;
+            height: 48px;
+            margin-bottom: 15px;
+        }
+        #filename-display { color: var(--primary-color); font-weight: 500; margin-top: 10px; }
+
+        .btn { 
+            display: block; 
+            width: 100%; 
+            padding: 15px; 
+            background-color: var(--primary-color); 
+            color: var(--bg-color); 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 1.1rem; 
+            font-weight: 700;
+            cursor: pointer; 
+            transition: background-color 0.3s; 
+        }
+        .btn:hover:not(:disabled) { background-color: var(--primary-hover); }
+        .btn:disabled { background-color: #535353; color: #a7a7a7; cursor: not-allowed; }
+
+        .processing-section { display: none; margin-top: 30px; }
+        .progress-container { margin-top: 20px; background-color: var(--border-color); border-radius: 8px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 12px; background-color: var(--primary-color); transition: width 0.4s ease-in-out; border-radius: 8px; }
+        #progress-log { margin-top: 15px; background-color: var(--bg-color); color: var(--text-secondary); padding: 15px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border-color); }
+        
+        .results { margin-top: 40px; }
+        .results h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 10px; font-size: 1.5rem; }
+        .results ul { list-style: none; padding: 0; }
+        .results li { background: var(--bg-color); border: 1px solid var(--border-color); padding: 12px 20px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
+        .results li:hover { background-color: #2a2a2a; }        
+        .stem-info { display: flex; align-items: center; gap: 15px; }
+        .stem-info svg { width: 24px; height: 24px; stroke: var(--text-secondary); }
+        .results .download-btn { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s, color 0.3s; font-weight: 500; }
+        .results .download-btn:hover { background-color: var(--primary-color); color: var(--bg-color); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--primary-color);"><path d="M2 10v3M6 7v10M10 4v16M14 7v10M18 10v3M22 10v3"></path></svg>
+            <h1>Music Deconstructor</h1>
+        </div>
+        <p class="subtitle">Separate any song into its instrumental stems using AI.</p>
+
+        <form id="upload-form" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file-input">Upload Audio File</label>
+                <div class="file-upload-wrapper" id="file-upload-area">
+                    <input type="file" name="file" id="file-input" required>
+                    <svg class="file-upload-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <p>Drag & drop your file here, or click to select</p>
+                    <p id="filename-display"></p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="components">Number of Stems</label>
+                <select name="components" id="components">
+                    <option value="4">4 (Vocals, Drums, Bass, Other)</option>
+                    <option value="6">6 (Vocals, Drums, Bass, Piano, Guitar, Other)</option>
+                    <option value="8">8 (Ultra - Slowest)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="model">Separation Model</label>
+                <select name="model" id="model">
+                    <option value="htdemucs">htdemucs (Balanced)</option>
+                    <option value="mdx_extra">mdx_extra (High Quality)</option>
+                    <option value="htdemucs_ft">htdemucs_ft (Best Quality)</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn" id="submit-btn">Deconstruct</button>
+        </form>
+
+        <div class="processing-section" id="processing-section">
+            <h3>Processing...</h3>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div id="progress-log"></div>
+        </div>
+
+        {% if results %}
+        <div class="results">
+            <h2>Results for: {{ filename }}</h2>
+            <ul>
+                {% for file in results %}
+                <li>
+                    <div class="stem-info">
+                        {% if 'Vocal' in file.name or 'Harmony' in file.name %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                        {% elif 'Drum' in file.name or 'Kick' in file.name or 'Cymbal' in file.name %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke-dasharray="2 4" stroke-dashoffset="1"></path></svg>
+                        {% elif 'Bass' in file.name %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6.343a4.5 4.5 0 0 1 0 6.314"></path><path d="M18 3.2a9 9 0 0 1 0 12.6"></path><path d="M6 15H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2"></path><path d="M12 15h-2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h2"></path><path d="M6 9H4"></path><path d="M12 9H9"></path></svg>
+                        {% elif 'Piano' in file.name %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+                        {% elif 'Guitar' in file.name %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 12-4-10 .5-1 2 2h3l2-2 .5 1z"></path><path d="m12 12 4 10-.5 1-2-2h-3l-2 2-.5-1z"></path></svg>
+                        {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        {% endif %}
+                        <span>{{ file.name }}</span>
+                    </div>
+                    <a href="{{ url_for('download_file', filepath=file.path) }}" class="download-btn">Download</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const fileUploadArea = document.getElementById('file-upload-area');
+        const filenameDisplay = document.getElementById('filename-display');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        const processingSection = document.getElementById('processing-section');
+        const progressBar = document.getElementById('progressBar');
+        const progressLog = document.getElementById('progress-log');
+
+        fileUploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                filenameDisplay.textContent = fileInput.files[0].name;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+
+            processingSection.style.display = 'block';
+            progressLog.textContent = 'Initializing...';
+            progressBar.style.width = '0%';
+
+            const formData = new FormData(uploadForm);
+            const response = await fetch('/process', { method: 'POST', body: formData });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        const data = line.substring(5).trim();
+                        if (data.startsWith('SEPARATION_COMPLETE::')) {
+                            const url = data.split('::')[1];
+                            window.location.href = url;
+                            return;
+                        } else if (data.startsWith('ERROR::')) {
+                            progressLog.textContent += `\n\nERROR: ${data.split('::')[1]}`;
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Deconstruct';
+                            return;
+                        }
+                        
+                        progressLog.textContent += `\n${data}`;
+                        progressLog.scrollTop = progressLog.scrollHeight;
+
+                        // Attempt to parse percentage from demucs output
+                        const match = data.match(/(\d+)%/);
+                        if (match) {
+                            progressBar.style.width = `${match[1]}%`;
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

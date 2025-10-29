@@ -1,1 +1,14 @@
+# Python virtual environment
 venv_demucs/
+*.venv/
+venv/
+
+# Uploaded audio files
+uploads/
+
+# Output files
+output_demucs/
+
+# Python cache
+__pycache__/
+*.pyc
