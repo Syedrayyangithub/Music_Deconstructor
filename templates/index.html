@@ -61,7 +61,7 @@
         }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
-        select { 
+        select, input[type="number"] { 
             width: 100%; 
             padding: 12px; 
             background-color: var(--bg-color);
@@ -124,6 +124,13 @@
         .results .download-btn { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s, color 0.3s; font-weight: 500; }
         .results .download-btn:hover { background-color: var(--primary-color); color: var(--bg-color); }
 
+        #file-queue { list-style: none; padding: 0; margin-top: 20px; }
+        #file-queue li { background-color: var(--bg-color); padding: 8px 12px; border-radius: 6px; margin-bottom: 5px; font-size: 0.9rem; color: var(--text-secondary); }
+        #file-queue li.processing { color: var(--primary-color); font-weight: 500; }
+        #file-queue li.completed { color: #6c757d; text-decoration: line-through; }
+
+        #all-results-container .results { margin-top: 20px; border-top: 2px solid var(--border-color); padding-top: 20px; }
+
         .button-group {
             display: flex;
             gap: 10px;
@@ -138,9 +145,25 @@
             background-color: var(--border-color);
             color: var(--text-color);
         }
-
-        .results .download-btn { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s, color 0.3s; font-weight: 500; }
-        .results .download-btn:hover { background-color: var(--primary-color); color: var(--bg-color); }
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-check-input {
+            width: auto;
+            margin: 0;
+        }
+        .form-check-label {
+            margin-bottom: 0;
+            font-weight: normal;
+            color: var(--text-color);
+        }
+        .form-text.text-muted {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        .d-block { display: block; }
     </style>
 </head>
 <body>
@@ -161,11 +184,12 @@
             {% endif %}
         {% endwith %}
 
+        <input type="file" name="file" id="file-input" required multiple style="display: none;">
+
         <form id="upload-form" method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="file-input">Upload Audio File</label>
                 <div class="file-upload-wrapper" id="file-upload-area">
-                    <input type="file" name="file" id="file-input" required>
                     <svg class="file-upload-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     <p>Drag & drop your file here, or click to select</p>
                     <p id="filename-display"></p>
@@ -190,7 +214,6 @@
                 </select>
             </div>
 
-            <!-- Example snippet for templates/index.html -->
             <div class="form-group form-check">
                 <input type="checkbox" class="form-check-input" id="enhance-checkbox" name="enhance" checked>
                 <label class="form-check-label" for="enhance-checkbox">Enhance Audio Quality</label>
@@ -201,7 +224,7 @@
 
             <div class="form-group">
                 <label for="silence-threshold">Silence Trimming Sensitivity (dB)</label>
-                <input type="number" id="silence-threshold" name="silence_threshold_db" min="0" max="60" value="30" class="form-control">
+                <input type="number" id="silence-threshold" name="silence_threshold_db" min="0" max="60" value="30">
                 <small class="form-text text-muted">Higher values (e.g., 40-60) trim more aggressively. Lower values (e.g., 10-20) preserve more quiet audio.</small>
             </div>
 
@@ -214,6 +237,7 @@
             <button type="submit" class="btn btn-secondary" id="clear-btn">Clear All Files</button>
         </form>
 
+        <ul id="file-queue"></ul>
 
         <div class="processing-section" id="processing-section">
             <h3>Processing...</h3>
@@ -223,6 +247,8 @@
             <button class="btn" id="cancel-btn" style="margin-top: 20px;">Cancel</button>
             <div id="progress-log"></div>
         </div>
+
+        <div id="all-results-container"></div>
 
         {% if results %}
         <div class="results">
@@ -260,46 +286,113 @@
         const fileUploadArea = document.getElementById('file-upload-area');
         const filenameDisplay = document.getElementById('filename-display');
         const submitBtn = document.getElementById('submit-btn');
+        const clearBtn = document.getElementById('clear-btn');
         const cancelBtn = document.getElementById('cancel-btn');
         
         const processingSection = document.getElementById('processing-section');
         const progressBar = document.getElementById('progressBar');
         const progressLog = document.getElementById('progress-log');
+        const fileQueueList = document.getElementById('file-queue');
+        const allResultsContainer = document.getElementById('all-results-container');
+
+        let fileQueue = [];
+        let isProcessing = false;
 
         fileUploadArea.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length > 0) {
-                filenameDisplay.textContent = fileInput.files[0].name;
-            }
+        
+        // Add drag and drop listeners
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileUploadArea.addEventListener(eventName, preventDefaults, false);
         });
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        fileUploadArea.addEventListener('drop', handleDrop, false);
+        function handleDrop(e) {
+            fileQueue.push(...e.dataTransfer.files);
+            updateQueueUI();
+        }
 
-        function resetUI(message) {
+        fileInput.addEventListener('change', handleFiles);
+        
+        function handleFiles() {
+            fileQueue.push(...fileInput.files);
+            updateQueueUI();
+            fileInput.value = ''; // Clear the input so the same files can be added again
+        }
+
+        function updateQueueUI() {
+            fileQueueList.innerHTML = '';
+            fileQueue.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.textContent = file.name;
+                if (isProcessing && index === 0) {
+                    li.className = 'processing';
+                }
+                fileQueueList.appendChild(li);
+            });
+            filenameDisplay.textContent = `${fileQueue.length} file(s) in queue.`;
+        }
+
+        function resetUI(message, isError = false) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Deconstruct';
-            processingSection.style.display = 'block'; // Keep it visible to show the final message
+            clearBtn.disabled = false;
+            cancelBtn.disabled = true; // Disable cancel when not processing
+            if (!isError) {
+                processingSection.style.display = 'none'; // Hide the processing section if not an error
+            }
             progressLog.textContent += `\n\n${message}`;
             progressLog.scrollTop = progressLog.scrollHeight;
+            isProcessing = false;
         }
 
         uploadForm.addEventListener('submit', async function(event) {
             event.preventDefault();
+            if (fileQueue.length === 0 || isProcessing) return;
+            
+            isProcessing = true;
             submitBtn.disabled = true;
+            clearBtn.disabled = true;
+            cancelBtn.disabled = false; // Enable cancel when processing starts
             submitBtn.textContent = 'Processing...';
+            allResultsContainer.innerHTML = ''; // Clear previous results
+            
+            processQueue();
+        });
+
+        async function processQueue() {
+            if (fileQueue.length === 0) {
+                resetUI("All files processed.");
+                updateQueueUI();
+                return;
+            }
+
+            const currentFile = fileQueue[0];
+            updateQueueUI();
+
             processingSection.style.display = 'block';
-            progressLog.textContent = 'Initializing...';
+            progressLog.textContent = `Initializing for ${currentFile.name}...`;
             progressBar.style.width = '0%';
 
             const formData = new FormData(uploadForm);
-            const controller = new AbortController();
-            const signal = controller.signal;
+            formData.set('file', currentFile); // Set the current file for this request
 
+            const controller = new AbortController();
             cancelBtn.onclick = () => {
-                controller.abort(); // Abort the client-side fetch request
-                fetch('/cancel', { method: 'POST' }); // Send request to kill the backend process
+                controller.abort();
+                fetch('/cancel', { method: 'POST' });
             };
 
+            let uniqueFilename = '';
+
             try {
-                const response = await fetch('/process', { method: 'POST', body: formData, signal });
+                const response = await fetch('/process', { method: 'POST', body: formData, signal: controller.signal });
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
@@ -310,35 +403,58 @@
                     const chunk = decoder.decode(value, { stream: true });
                     const lines = chunk.split('\n\n');
 
-                    lines.forEach(line => {
+                    for (const line of lines) {
                         if (line.startsWith('data:')) {
                             const data = line.substring(5).trim();
                             if (data.startsWith('SEPARATION_COMPLETE::')) {
-                                window.location.href = data.split('::')[1];
+                                uniqueFilename = data.split('::')[1]; // The backend now sends the unique_filename
+                                break; // Exit the inner loop
                             } else if (data.startsWith('ERROR::')) {
-                                resetUI(`ERROR: ${data.split('::')[1]}`);
+                                throw new Error(data.split('::')[1]);
                             } else {
                                 progressLog.textContent += `\n${data}`;
                                 progressLog.scrollTop = progressLog.scrollHeight;
                                 const match = data.match(/(\d+)%/);
-                                if (match) {
-                                    progressBar.style.width = `${match[1]}%`;
-                                }
+                                if (match) progressBar.style.width = `${match[1]}%`;
                             }
                         }
-                    });
+                    }
+                    if (uniqueFilename) break; // Exit the outer while loop
                 }
+
+                // Fetch and display results for the completed file
+                const resultsResponse = await fetch('/results-for-file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        unique_filename: uniqueFilename,
+                        components: formData.get('components'),
+                        model: formData.get('model')
+                    })
+                });
+
+                if (!resultsResponse.ok) {
+                    throw new Error(`Fetching results failed with status: ${resultsResponse.status}`);
+                }
+
+                const resultsData = await resultsResponse.json();
+                allResultsContainer.insertAdjacentHTML('beforeend', resultsData.html);
+
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    // This error is expected when the user clicks cancel.
-                    resetUI("Processing cancelled by user.");
+                    resetUI("Processing cancelled by user.", false);
+                    fileQueue = []; // Clear the queue on cancel
+                    updateQueueUI();
+                    return;
                 } else {
-                    // Handle unexpected network errors
-                    resetUI('An unexpected network error occurred.');
-                    console.error(err);
+                    resetUI(`ERROR: ${err.message}`, true);
                 }
             }
-        });
+
+            // Move to the next file
+            fileQueue.shift();
+            processQueue();
+        }
     </script>
 </body>
 </html>

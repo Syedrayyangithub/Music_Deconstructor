@@ -1,225 +1,112 @@
-#  Advanced Music Source Separation
+# AI Music Deconstructor
 
-## Overview
-This project uses Facebook's Demucs library to separate music into multiple components: vocals, drums, bass, and other instruments. It supports 4, 6, and 8-component separation with advanced techniques.
+A powerful web application and command-line tool for separating music into its instrumental stems using state-of-the-art AI models from [Demucs](https://github.com/facebookresearch/demucs). This tool allows users to upload an audio file and deconstruct it into various components like vocals, drums, bass, and more.
+
+The project features a user-friendly web interface built with Flask that provides real-time progress updates, along with a flexible Python script for backend processing.
 
 ## Features
 
-###  Multi-Component Separation
-- **4 Components**: vocals, drums, bass, other
-- **6 Components**: vocals, drums, bass, piano, guitar, other  
-- **8 Components**: vocals, drums, bass, other, lead vocals, harmony, kick/snare, cymbals, piano, guitar
+- **Multiple Stem Separation Options:**
+  - **4 Stems:** Vocals, Drums, Bass, Other
+  - **6 Stems:** Vocals, Drums, Bass, Piano, Guitar, Other (via multi-pass separation)
+  - **8 Stems:** Advanced separation into Lead Vocals, Harmony, Kick/Snare, Cymbals, and more.
+- **Choice of AI Models:** Select from different Demucs models (`htdemucs`, `mdx_extra`, `htdemucs_ft`) to balance speed and quality.
+- **Optional Audio Enhancement:** Automatically applies post-processing effects (normalization, compression, EQ) to enhance the clarity and quality of the separated stems.
+- **Configurable Silence Trimming:** Intelligently removes leading/trailing silence from stems to reduce file size. The sensitivity of the trimming is adjustable.
+- **Dynamic Web Interface:**
+  - Modern, responsive UI with drag-and-drop file uploads.
+  - Real-time progress bar and log powered by Server-Sent Events (SSE).
+  - **Cancel Button:** Stop the separation process at any time.
+  - **Clear Files Button:** Easily delete all uploaded and generated files to free up space.
+- **Dual Usage:** Can be run as a web application or as a standalone command-line tool.
 
-###  Advanced Features
-- **Multiple Demucs Models**: htdemucs, mdx_extra, htdemucs_ft
-- **Two-Stems Technique**: Further separate "other" into piano and guitar
-- **Multi-Pass Separation**: Re-processes stems for more granular output (used in 8-component mode)
-- **Professional CLI**: Command-line interface with comprehensive options
-- **Batch Processing**: Process multiple files (coming soon)
-- **Multiple Formats**: MP3, WAV, FLAC, M4A, AAC support
+## Technology Stack
 
-## Installation
+- **Backend:** Python, Flask
+- **AI Model:** Demucs
+- **Audio Processing:** Librosa, SoundFile, NumPy
+- **Frontend:** HTML5, CSS3, JavaScript (Fetch API, SSE)
 
-1. **Clone/Download** this repository
-2. **Install Demucs** in virtual environment:
-   ```bash
-   python -m venv venv_demucs
-   venv_demucs\Scripts\activate
-   pip install demucs
-   ```
+## Project Structure
+
+```
+music-separator/
+├── app.py                  # Flask web server and API routes
+├── music_separator.py      # Core logic for audio separation and enhancement (can be run standalone)
+├── templates/
+│   └── index.html          # Frontend HTML, CSS, and JavaScript
+├── uploads/                # Directory for user-uploaded audio files
+└── output_demucs/          # Directory for the separated output stems
+```
+
+## Setup and Installation
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone <your-repository-url>
+    cd music-separator
+    ```
+
+2.  **Create a Virtual Environment:**
+    It is highly recommended to use a virtual environment.
+    ```bash
+    python -m venv venv_demucs
+    source venv_demucs/bin/activate  # On Windows, use `venv_demucs\Scripts\activate`
+    ```
+
+3.  **Install Dependencies:**
+    First, install PyTorch according to your system's specifications (CPU or GPU). You can find the correct command on the [PyTorch website](https://pytorch.org/get-started/locally/).
+
+    Then, install Demucs and other required Python packages:
+    ```bash
+    pip install -U demucs
+    pip install flask librosa soundfile numpy
+    ```
 
 ## Usage
 
-### Basic Usage
+### 1. Web Application
+
+To run the user-friendly web interface, execute the `app.py` script:
+
 ```bash
-# 4-component separation (standard)
-python music_separator.py input_file.mp3 -c 4
-
-# 6-component separation (advanced)
-python music_separator.py input_file.mp3 -c 6
-
-# 8-component separation (ultra)
-python music_separator.py input_file.mp3 -c 8
+python app.py
 ```
 
-### Advanced Usage
+Navigate to `http://127.0.0.1:5000` in your web browser.
+
+1.  Drag and drop or select an audio file.
+2.  Choose the desired number of stems, separation model, and enhancement options.
+3.  Click "Deconstruct" to start the process.
+4.  Monitor the progress in real-time. You can cancel the process at any point.
+5.  Once complete, you will be redirected to a results page with download links for each stem.
+
+### 2. Command-Line Interface (CLI)
+
+You can also use `music_separator.py` directly from your terminal for more advanced or scripted use.
+
+**Basic Usage (4 stems):**
 ```bash
-# Use different Demucs model
-python music_separator.py input.mp3 -m mdx_extra -c 6
-
-# Custom output directory
-python music_separator.py input.mp3 -o my_output -c 4
-
-# Use GPU acceleration (if available)
-python music_separator.py input.mp3 -d cuda -c 8
+python music_separator.py "path/to/your/song.mp3"
 ```
 
-### Command Line Options
-- `input` - Input audio file
-- `-c, --components` - Number of components (4, 6, or 8)
-- `-m, --model` - Demucs model: htdemucs, mdx_extra, htdemucs_ft
-- `-d, --device` - Processing device: cpu, cuda, mps
-- `-o, --output` - Output directory (default: output_demucs)
-
-## Output Structure
-
-### 4-Component Output
-```
-output_demucs/
- htdemucs/
-     song_name/
-         vocals.wav      # Lead vocals and harmonies
-         drums.wav       # Drums and percussion
-         bass.wav        # Bass guitar and low frequencies
-         other.wav       # Other instruments
-```
-
-### 6-Component Output
-```
-output_demucs/
- 6_components/
-     song_name/
-         vocals.wav      # Lead vocals and harmonies
-         drums.wav       # Drums and percussion
-         bass.wav        # Bass guitar and low frequencies
-         piano.wav       # Piano and keyboard instruments
-         guitar.wav      # Electric and acoustic guitars
-         other.wav       # Brass, strings, synths, etc.
-```
-
-### 8-Component Output
-```
-output_demucs/
- 8_components/
-     song_name/
-         vocals.wav_1    # Vocals (htdemucs model)
-         drums.wav_1     # Drums (htdemucs model)
-         bass.wav_1      # Bass (htdemucs model)
-         other.wav_1     # Other (htdemucs model)
-         vocals.wav_2    # Vocals (mdx_extra model)
-         drums.wav_2     # Drums (mdx_extra model)
-         bass.wav_2      # Bass (mdx_extra model)
-         other.wav_2     # Other (mdx_extra model)
-```
-
-## Examples
-
-### 4-Component Separation
+**Advanced Usage (6 stems, high-quality model, no enhancement):**
 ```bash
-python music_separator.py 7years.mp3 -c 4
-```
-**Output:**
-```
- Starting ULTRA 4-component separation for: 7years.mp3
- Running standard 4-component separation...
- Ultra separation complete!
-
- ULTRA 4-COMPONENT SEPARATION RESULTS:
-  VOCALS - Lead vocals and harmonies
-    vocals.wav (39.9 MB)
-  DRUMS - Kick, snare, hi-hats, cymbals
-    drums.wav (39.9 MB)
-  BASS - Bass guitar and low-frequency instruments
-    bass.wav (39.9 MB)
-  OTHER - Piano, guitar, synths, strings, etc.
-    other.wav (39.9 MB)
+python music_separator.py "path/to/your/song.mp3" -c 6 -m mdx_extra --no-enhance
 ```
 
-### 6-Component Separation
-```bash
-python music_separator.py 7years.mp3 -c 6
-```
-**Output:**
-```
- Starting ULTRA 6-component separation for: 7years.mp3
- Running 6-component separation using two-stems technique...
- Further separating 'other' component...
- Created piano.wav
- Created guitar.wav
- Ultra separation complete!
+**Full List of CLI Options:**
 
- ULTRA 6-COMPONENT SEPARATION RESULTS:
-  VOCALS - Lead vocals and harmonies
-  DRUMS - Kick, snare, hi-hats, cymbals
-  BASS - Bass guitar and low-frequency instruments
-  PIANO - Piano and keyboard instruments
-  GUITAR - Electric and acoustic guitars
-  OTHER - Brass, strings, synths, etc.
-```
-
-## Applications
-
-###  Music Production
-- **Karaoke Creation** - Use vocals.wav for karaoke tracks
-- **Remixing** - Isolate specific instruments for remixing
-- **Sample Libraries** - Extract drum loops, bass lines, etc.
-- **Cover Songs** - Use instrumental backing tracks
-
-###  Audio Analysis
-- **Music Education** - Study individual instrument parts
-- **Transcription** - Easier to transcribe specific instruments
-- **Mixing Practice** - Learn mixing with isolated stems
-
-###  Creative Projects
-- **Mashup Creation** - Combine different stems
-- **Audio Effects** - Process isolated components
-- **Live Performance** - Real-time stem separation
-
-## Technical Details
-
-### Models Available
-- **htdemucs** - Default model, good balance of quality and speed
-- **mdx_extra** - Higher quality, trained with extra data
-- **htdemucs_ft** - Fine-tuned version, highest quality
-
-### Performance
-- **CPU Processing** - Slower but works on any system
-- **GPU Processing** - Much faster with CUDA-compatible GPU
-- **Processing Time** - Varies by file length and hardware
-
-## Troubleshooting
-
-### Common Issues
-1. **"No module named demucs"** - Activate virtual environment
-2. **CUDA errors** - Use `-d cpu` for CPU processing
-3. **File not found** - Check file path and extension
-
-### Solutions
-```bash
-# Activate virtual environment
-venv_demucs\Scripts\activate
-
-# Use CPU if GPU issues
-python music_separator.py input.mp3 -d cpu -c 4
-
-# Check file exists
-dir *.mp3
-```
-
-## Project Structure
-```
-music-separator/
- music_separator.py      # Main separation script
- README.md              # This file
- venv_demucs/           # Virtual environment
- 7years.mp3            # Sample audio file
- my_song.mp3           # Sample audio file
- whatsappAudio.mp3     # Sample audio file
-```
-
-## Future Enhancements
-- **Web Interface** - Browser-based GUI
-- **Real-time Processing** - Live audio separation
-- **Cloud Integration** - Upload to cloud storage
-- **Mobile App** - Smartphone application
-- **API Development** - REST API for integration
-
-## License
-This project uses Demucs library. Please check Demucs license for usage terms.
+| Argument              | Alias | Description                                                  | Default      |
+| --------------------- | ----- | ------------------------------------------------------------ | ------------ |
+| `input`               |       | Input audio file path.                                       | (Required)   |
+| `--output`            | `-o`  | Output directory for separated files.                        | `output_demucs` |
+| `--model`             | `-m`  | Demucs model to use (`htdemucs`, `htdemucs_ft`, `mdx_extra`). | `htdemucs`   |
+| `--device`            | `-d`  | Device to use (`cpu`, `cuda`).                               | `cpu`        |
+| `--components`        | `-c`  | Number of stems to separate (`4`, `6`, `8`).                 | `4`          |
+| `--no-enhance`        |       | Disable the audio enhancement post-processing step.          | (flag)       |
+| `--silence-threshold` |       | dB threshold for silence trimming (e.g., `20` for less, `40` for more). | `30`         |
 
 ---
-**Created by:** Advanced Music Source Separation Project  
-**Version:** 2.0 (Multi-Component Enhanced)  
-**Last Updated:** 2025
 
-# Music_Deconstructor
+This project provides a comprehensive and flexible solution for music source separation, suitable for both casual users via its web UI and advanced users through its command-line capabilities.

@@ -16,12 +16,6 @@ ACTIVE_PROCESSES = {}
 def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_threshold_db: int = 30):
     """
     Enhance audio using librosa for better quality
-    
-    Args:
-        input_file (str): Path to input audio file
-        output_file (str): Path to output enhanced audio file
-        enhancement_type (str): Type of enhancement (vocals, drums, bass, other)
-        silence_threshold_db (int): dB threshold for silence trimming.
     """
     try:
         # Load audio file
@@ -37,47 +31,26 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_th
         
         if enhancement_type == "vocals":
             # Enhance vocals: reduce noise, normalize, and boost clarity
-            # Normalize audio
             y_normalized = librosa.util.normalize(y_trimmed)
-            # Apply gentle compression to vocals
             y_enhanced = np.tanh(y_normalized * 1.2) * 0.8
-            # Boost high frequencies for clarity
             y_enhanced = librosa.effects.preemphasis(y_enhanced, coef=0.97)
             
         elif enhancement_type == "drums":
-            # Enhance drums: boost low frequencies, normalize
             y_normalized = librosa.util.normalize(y_trimmed)
-            
-            # Boost low frequencies for kick and snare
             y_enhanced = y_normalized * 1.3
-            
-            # Apply gentle compression
             y_enhanced = np.tanh(y_enhanced * 1.1) * 0.9
             
         elif enhancement_type == "bass":
-            # Enhance bass: boost low frequencies, normalize
             y_normalized = librosa.util.normalize(y_trimmed)
-            
-            # Boost low frequencies
             y_enhanced = y_normalized * 1.4
-            
-            # Apply gentle compression
             y_enhanced = np.tanh(y_enhanced * 1.2) * 0.8
             
         else:  # other instruments
-            # Enhance other instruments: normalize and boost clarity
             y_normalized = librosa.util.normalize(y_trimmed)
-            
-            # Apply gentle enhancement
             y_enhanced = y_normalized * 1.1
-            
-            # Boost mid frequencies
             y_enhanced = librosa.effects.preemphasis(y_enhanced, coef=0.95)
         
-        # Ensure no clipping
         y_enhanced = np.clip(y_enhanced, -1.0, 1.0)
-        
-        # Save enhanced audio
         sf.write(output_file, y_enhanced, sr)
         return True
         
@@ -92,8 +65,8 @@ def _get_enhancement_map():
         "drums": "drums",
         "bass": "bass",
         "other": "other",
-        "piano": "other",  # Piano is treated like 'other'
-        "guitar": "other", # Guitar is treated like 'other'
+        "piano": "other",
+        "guitar": "other",
         "lead_vocals": "vocals",
         "harmony": "vocals",
         "kick_snare": "drums",
@@ -103,19 +76,6 @@ def _get_enhancement_map():
 def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_target=None, job_id: Optional[str] = None, progress_callback: Optional[Callable[[str], None]] = None):
     """
     Helper function to build and run a Demucs command.
-    
-    Args:
-        venv_python (str): Path to the virtual environment's python executable.
-        input_file (str): Path to the input audio file.
-        output_dir (str): Directory to save the output.
-        model (str): The Demucs model to use.
-        device (str): The processing device (cpu, cuda).
-        two_stems_target (str, optional): The target for a two-stems separation.
-        job_id (str, optional): A unique ID for this job to allow for cancellation.
-        progress_callback (Callable, optional): A function to call with each line of progress output.
-
-    Returns:
-        subprocess.CompletedProcess: The result of the subprocess run.
     """
     command = [
         venv_python, "-m", "demucs",
@@ -136,40 +96,28 @@ def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_ta
         if job_id:
             ACTIVE_PROCESSES[job_id] = proc
 
-        # Demucs prints its progress bar to stderr
         if proc.stderr:
             for line in iter(proc.stderr.readline, ''):
                 line = line.strip()
                 if progress_callback:
                     yield progress_callback(line)
-                else: # Default behavior: print to console if no callback
+                else:
                     print(line.strip())
         
         stdout, stderr = proc.communicate()
 
-        if proc.returncode != 0 and proc.returncode != -9: # -9 is the exit code when killed
+        if proc.returncode != 0 and proc.returncode != -9: # -9 is kill signal
             print(f"Demucs Error: {stderr}")
             raise subprocess.CalledProcessError(proc.returncode, command, output=stdout, stderr=stderr)
     finally:
         if job_id and job_id in ACTIVE_PROCESSES:
-            # Clean up the process from our tracking dictionary
             del ACTIVE_PROCESSES[job_id]
         if proc and proc.poll() is None:
-            # Ensure the process is terminated if the generator is exited early
             proc.kill()
 
 def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs", device="cpu", components=4, enhance=True, silence_threshold_db: int = 30, progress_callback: Optional[Callable[[str], None]] = None):
     """
     Ultra audio separation with multiple component options and enhancement
-    
-    Args:
-        input_file (str): Path to input audio file
-        output_dir (str): Output directory for separated files
-        model (str): Demucs model to use
-        device (str): Device to use (cpu, cuda, mps)
-        components (int): Number of components to separate (4, 6, 8)
-        enhance (bool): Whether to enhance audio quality
-        silence_threshold_db (int): dB threshold for silence trimming during enhancement.
     """
     print(f" Starting ULTRA {components}-component separation for: {input_file}")
     print(f" Output directory: {output_dir}")
@@ -179,12 +127,8 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
     print(f" Audio Enhancement: {'ON' if enhance else 'OFF'}")
     print("-" * 70)
     
-    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
-    # Use the virtual environment's Python
-    # Using sys.executable is more portable than hardcoding the path.
-    # It assumes this script is run with the python from the desired venv.
     venv_python = sys.executable
     if "venv_demucs" not in venv_python:
         print("Warning: Not running from 'venv_demucs'. Using system python. Demucs must be in the system path.")
@@ -194,7 +138,7 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
             if progress_callback: yield progress_callback(f"ERROR: Input file '{input_file}' not found")
             return
             
-        job_id = Path(input_file).name # Use the unique filename as the job ID
+        job_id = Path(input_file).name
         
         if components == 4:
             yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
@@ -203,7 +147,6 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
             yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
             
         elif components == 8:
-            # Note: The model parameter is ignored here as the function uses the best one.
             yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
         
         print(" Ultra separation complete!")
@@ -213,7 +156,7 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
     except FileNotFoundError as e:
         if progress_callback: yield progress_callback(f"ERROR: {e}")
     except subprocess.CalledProcessError as e:
-        if e.returncode != -9: # Don't show an error if it was cancelled by the user
+        if e.returncode != -9:
             error_message = f"Demucs processing error: {e.stderr}"
             if progress_callback: yield progress_callback(f"ERROR: {error_message}")
     except Exception as e:
@@ -230,12 +173,9 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
     """Handles 6-component separation using a two-pass technique."""
     if progress_callback: yield progress_callback("Running 6-component separation (Pass 1/2)...")
     
-    # First pass: Standard 4-component separation
     yield from _run_demucs(venv_python, input_file, output_dir, model, device, job_id=job_id, progress_callback=progress_callback)
     
-    # Second pass: Further separate "other" into piano and guitar
-    base_name = Path(input_file).stem
-    # The output directory is named after the model used
+    base_name = Path(input_file).stem 
     track_dir = os.path.join(output_dir, model, base_name)
     other_file = os.path.join(track_dir, "other.wav")
     
@@ -244,24 +184,20 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
         advanced_output_dir = os.path.join(output_dir, "advanced")
         yield from _run_demucs(venv_python, other_file, advanced_output_dir, model, device, "other", job_id=f"{job_id}-other", progress_callback=progress_callback)
         
-        # Organize the final 6-component structure
         create_6_component_structure(track_dir, output_dir, base_name, model)
         
         if enhance:
             if progress_callback: yield progress_callback("Enhancing audio quality...")
-            enhance_6_components(input_file, output_dir, silence_threshold_db) # Enhancement functions don't take progress_callback
+            enhance_6_components(input_file, output_dir, silence_threshold_db)
 
 def _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, job_id: str, progress_callback: Optional[Callable[[str], None]] = None):
     
-    # For 8-component separation, always use the highest quality model for best results.
     best_model = "htdemucs_ft"
     print(f" Overriding model to '{best_model}' for highest quality 8-component separation.")
     
-    # First pass: Standard 4-component separation
     print(" Pass 1/2: Standard 4-component separation...")
     yield from _run_demucs(venv_python, input_file, output_dir, best_model, device, job_id=job_id, progress_callback=progress_callback)
     
-    # Second pass: Further separate each component
     base_name = Path(input_file).stem
     track_dir = os.path.join(output_dir, best_model, base_name)
     
@@ -298,18 +234,19 @@ def enhance_4_components(input_file, output_dir, model="htdemucs", silence_thres
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            # Create a temporary path for the enhanced file
             temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
             if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
-                os.remove(input_path) # Delete the original file
-                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
+                os.remove(input_path)
+                os.rename(temp_enhanced_path, input_path)
             else:
-                print(f"   Skipped empty {filename} (after trimming)")
-                os.remove(input_path) # Delete the original file as it's considered empty
-                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                # *** THIS IS THE FIX ***
+                # We do NOT delete the original file.
+                print(f"   Skipped empty {filename} (after trimming), original file kept.")
+                if os.path.exists(temp_enhanced_path): # Clean up temp file
                     os.remove(temp_enhanced_path)
+
 def enhance_6_components(input_file, output_dir, silence_threshold_db: int = 30):
     """Enhance 6-component separation results"""
     base_name = Path(input_file).stem
@@ -323,18 +260,18 @@ def enhance_6_components(input_file, output_dir, silence_threshold_db: int = 30)
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            # Create a temporary path for the enhanced file
             temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
             if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
-                os.remove(input_path) # Delete the original file
-                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
+                os.remove(input_path)
+                os.rename(temp_enhanced_path, input_path)
             else:
-                print(f"   Skipped empty {filename} (after trimming)")
-                os.remove(input_path) # Delete the original file as it's considered empty
-                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                # *** THIS IS THE FIX ***
+                print(f"   Skipped empty {filename} (after trimming), original file kept.")
+                if os.path.exists(temp_enhanced_path):
                     os.remove(temp_enhanced_path)
+
 def enhance_8_components(input_file, output_dir, silence_threshold_db: int = 30):
     """Enhance 8-component separation results"""
     base_name = Path(input_file).stem
@@ -348,26 +285,24 @@ def enhance_8_components(input_file, output_dir, silence_threshold_db: int = 30)
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
-            # Create a temporary path for the enhanced file
             temp_enhanced_path = os.path.join(track_dir, f"temp_enhanced_{filename}")
             enhancement_type = enhancement_map.get(stem_name, "other")
             if enhance_audio(input_path, temp_enhanced_path, enhancement_type, silence_threshold_db):
                 print(f"   Enhanced {filename}")
-                os.remove(input_path) # Delete the original file
-                os.rename(temp_enhanced_path, input_path) # Rename the temporary enhanced file to the original filename
+                os.remove(input_path)
+                os.rename(temp_enhanced_path, input_path)
             else:
-                print(f"   Skipped empty {filename} (after trimming)")
-                os.remove(input_path) # Delete the original file as it's considered empty
-                if os.path.exists(temp_enhanced_path): # Clean up temp file if it somehow exists
+                # *** THIS IS THE FIX ***
+                print(f"   Skipped empty {filename} (after trimming), original file kept.")
+                if os.path.exists(temp_enhanced_path):
                     os.remove(temp_enhanced_path)
+
 def create_6_component_structure(track_dir, output_dir, base_name, model="htdemucs"):
     """Create 6-component structure from 4-component separation"""
-    # The advanced separation creates a folder named after the input file
     advanced_dir = os.path.join(output_dir, "advanced", model, "other")
     final_dir = os.path.join(output_dir, "6_components", base_name)
     os.makedirs(final_dir, exist_ok=True)
     
-    # Copy original 4 components
     components = ["vocals.wav", "drums.wav", "bass.wav", "other.wav"]
     for comp in components:
         src = os.path.join(track_dir, comp)
@@ -375,16 +310,13 @@ def create_6_component_structure(track_dir, output_dir, base_name, model="htdemu
         if os.path.exists(src):
             shutil.copy(src, dst)
     
-    # Copy separated "other" components
     if os.path.exists(advanced_dir):
-        # Copy other.wav as piano.wav
         other_src = os.path.join(advanced_dir, "other.wav")
         other_dst = os.path.join(final_dir, "piano.wav")
         if os.path.exists(other_src):
             shutil.copy(other_src, other_dst)
             print(f" Created piano.wav")
         
-        # Copy no_other.wav as guitar.wav
         no_other_src = os.path.join(advanced_dir, "no_other.wav")
         no_other_dst = os.path.join(final_dir, "guitar.wav")
         if os.path.exists(no_other_src):
@@ -402,15 +334,11 @@ def create_8_component_structure_direct(track_dir, output_dir, base_name):
     final_dir = os.path.join(output_dir, "8_components", base_name)
     os.makedirs(final_dir, exist_ok=True)
     
-    # Define a map of source files to their final destination names.
-    # Format: (source_directory, source_filename, destination_filename)
     file_map = [
-        # Original 4 stems
         (track_dir, "vocals.wav", "vocals.wav"),
         (track_dir, "drums.wav", "drums.wav"),
         (track_dir, "bass.wav", "bass.wav"),
         (track_dir, "other.wav", "other.wav"),
-        # Advanced stems
         (os.path.join(output_dir, "advanced_vocals", "htdemucs_ft", "vocals"), "vocals.wav", "lead_vocals.wav"),
         (os.path.join(output_dir, "advanced_vocals", "htdemucs_ft", "vocals"), "no_vocals.wav", "harmony.wav"),
         (os.path.join(output_dir, "advanced_drums", "htdemucs_ft", "drums"), "drums.wav", "kick_snare.wav"),
@@ -427,9 +355,6 @@ def create_8_component_structure_direct(track_dir, output_dir, base_name):
 def get_separation_results(input_file, output_dir, components, model):
     """
     Gets a list of relative paths for the output files of a separation job.
-
-    Returns:
-        A list of dictionaries, e.g., [{'name': 'vocals.wav', 'path': 'htdemucs/song/vocals.wav'}]
     """
     base_name = Path(input_file).stem
     results = []
@@ -447,8 +372,8 @@ def get_separation_results(input_file, output_dir, components, model):
         track_dir = os.path.join(output_dir, relative_dir)
         files_to_check = [
             "vocals.wav", "drums.wav", "bass.wav", "other.wav",
-            "lead_vocals.wav", "harmony.wav", "kick_snare.wav",
-            "cymbals.wav", "piano.wav", "guitar.wav"
+            "lead_vocals.wav", "harmony.wav", "kick_snare.wav", "cymbals.wav", 
+            "piano.wav", "guitar.wav"
         ]
     else:
         return []
@@ -470,9 +395,9 @@ def _print_component_info(track_dir, emoji, description, filename):
     print(f"{emoji} - {description}")
     if os.path.exists(file_path):
         file_size = os.path.getsize(file_path) / (1024 * 1024)
-        print(f"    {filename} ({file_size:.1f} MB)")
+        print(f"     {filename} ({file_size:.1f} MB)")
     else:
-        print(f"    {filename} (File not found)")
+        print(f"     {filename} (File not found)")
 
 def print_ultra_components_info(input_file, output_dir, components, model):
     """Print information about separated components"""
@@ -482,10 +407,11 @@ def print_ultra_components_info(input_file, output_dir, components, model):
     print(f" ULTRA {components}-COMPONENT SEPARATION RESULTS:")
     print("=" * 70)
     
-    if components == 4:
-        # Need to determine which model was actually used for the output path
-        track_dir = os.path.join(output_dir, model, base_name)
+    track_dir = "" # Initialize
+    components_info = []
 
+    if components == 4:
+        track_dir = os.path.join(output_dir, model, base_name)
         components_info = [
             (" VOCALS", "Lead vocals and harmonies", "vocals.wav"),
             (" DRUMS", "Kick, snare, hi-hats, cymbals", "drums.wav"),
@@ -493,9 +419,6 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" OTHER", "Piano, guitar, synths, strings, etc.", "other.wav")
         ]
         
-        for emoji, description, filename in components_info:
-            _print_component_info(track_dir, emoji, description, filename)
-    
     elif components == 6:
         track_dir = os.path.join(output_dir, "6_components", base_name)
         components_info = [
@@ -506,10 +429,7 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" GUITAR", "Electric and acoustic guitars", "guitar.wav"),
             (" OTHER", "Brass, strings, synths, etc.", "other.wav")
         ]
-        
-        for emoji, description, filename in components_info:
-            _print_component_info(track_dir, emoji, description, filename)
-    
+
     elif components == 8:
         track_dir = os.path.join(output_dir, "8_components", base_name)
         components_info = [
@@ -524,17 +444,19 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" PIANO", "Piano and keyboard instruments", "piano.wav"),
             (" GUITAR", "Electric and acoustic guitars", "guitar.wav")
         ]
-        
+    
+    if track_dir: # Ensure track_dir was set
         for emoji, description, filename in components_info:
             _print_component_info(track_dir, emoji, description, filename)
-    
-    print(f"\n All files saved in: {track_dir}")
+        print(f"\n All files saved in: {track_dir}")
+    else:
+        print("   Error: Invalid component number.")
+        
     print("=" * 70)
 
 def main():
-    # Make parser accessible to other functions if needed
-    main.parser = argparse.ArgumentParser(description="Ultra-Enhanced Music Source Separation with Audio Enhancement")
-    parser = main.parser
+    parser = argparse.ArgumentParser(description="Ultra-Enhanced Music Source Separation with Audio Enhancement")
+    main.parser = parser
 
     parser.add_argument("input", help="Input audio file")
     parser.add_argument("-o", "--output", default="output_demucs", help="Output directory")
@@ -560,7 +482,7 @@ def main():
     print(f" Silence Trim Threshold: {args.silence_threshold} dB")
     print("=" * 70)
     
-    # When run as a script, we iterate through the generator to execute it.
+
     for _ in separate_audio_ultra(
         args.input, 
         args.output, 
@@ -569,13 +491,12 @@ def main():
         args.components,
         enhance=not args.no_enhance,
         silence_threshold_db=args.silence_threshold,
-        progress_callback=print # Print progress to console
+        progress_callback=print
     ):
         pass
     
     print("\n Separation process finished.")
-
-# Add a default attribute to the main function for the parser
+    
 main.parser = None
 
 if __name__ == "__main__":

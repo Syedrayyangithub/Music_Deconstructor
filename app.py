@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, render_template, send_from_directory, redirect, url_for, Response, session, current_app, flash
+from flask import Flask, request, render_template, send_from_directory, redirect, url_for, Response, session, current_app, flash, jsonify
 from werkzeug.utils import secure_filename
 import uuid
 from pathlib import Path
@@ -52,13 +52,9 @@ def process():
         "silence_threshold_db": silence_threshold_db # Store in session
     }
 
-    # --- THIS IS THE FIX ---
-    # 1. Get ALL context-bound variables *now*.
-    results_url_for_later = url_for('results_page', _external=True)
     output_dir_for_later = current_app.config['OUTPUT_FOLDER']
 
-    # 2. Create the generator function that *accepts* the variables.
-    def generate_progress(results_url, output_dir):
+    def generate_progress(output_dir):
         try:
             for progress_line in separate_audio_ultra(
                 input_path,
@@ -72,14 +68,13 @@ def process():
                 if progress_line:
                     yield progress_line
 
-            # Use the pre-generated URL string
-            yield f"data: SEPARATION_COMPLETE::{results_url}\n\n"
+            # For batch processing, send back the unique filename so the client can fetch results.
+            yield f"data: SEPARATION_COMPLETE::{unique_filename}\n\n"
             
         except Exception as e:
             yield f"data: ERROR::{str(e)}\n\n"
 
-    # 3. Pass ALL variables into the generator when creating the Response.
-    return Response(generate_progress(results_url_for_later, output_dir_for_later), mimetype='text/event-stream')
+    return Response(generate_progress(output_dir_for_later), mimetype='text/event-stream')
 
 @app.route('/results')
 def results_page():
@@ -88,7 +83,6 @@ def results_page():
         return redirect(url_for('index'))
 
     unique_filename = last_file_info['filename']
-    # We MUST use current_app here because this route *has* context.
     input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
     
     results = get_separation_results(
@@ -99,6 +93,24 @@ def results_page():
     )
     original_filename = unique_filename.split('_', 1)[-1]
     return render_template('index.html', results=results, filename=original_filename)
+
+@app.route('/results-for-file', methods=['POST'])
+def results_for_file():
+    """API endpoint to get the rendered HTML for a single file's results."""
+    data = request.get_json()
+    unique_filename = data.get('unique_filename')
+    
+    input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+    
+    results = get_separation_results(
+        input_path,
+        current_app.config['OUTPUT_FOLDER'],
+        int(data.get('components')),
+        data.get('model')
+    )
+    original_filename = unique_filename.split('_', 1)[-1]
+    rendered_html = render_template('results_partial.html', results=results, filename=original_filename)
+    return jsonify({'html': rendered_html})
 
 @app.route('/download/<path:filepath>')
 def download_file(filepath):
