@@ -149,7 +149,7 @@
         .form-text.text-muted { font-size: 0.85rem; color: var(--text-secondary); }
         .d-block { display: block; }
 
-        /* --- NEW FUSION STYLES --- */
+        /* --- FUSION STYLES --- */
         .fusion-pad {
             margin-top: 40px;
             padding: 30px;
@@ -218,7 +218,7 @@
                 <select name="components" id="components">
                     <option value="4">4 (Vocals, Drums, Bass, Other)</option>
                     <option value="6">6 (Vocals, Drums, Bass, Piano, Guitar, Other)</option>
-                    <option value="8">8 (Ultra - Slowest)</option>
+                    <option value="8">8 (Ultra - 10 stems)</option>
                 </select>
             </div>
 
@@ -277,23 +277,7 @@
                 <select id="master-tempo-select" class="fusion-select"></select>
             </div>
             
-            <div class="fusion-grid">
-                <div class="form-group">
-                    <label for="vocals-select">Vocals</label>
-                    <select id="vocals-select" class="fusion-select" data-stem="vocals"></select>
-                </div>
-                <div class="form-group">
-                    <label for="drums-select">Drums</label>
-                    <select id="drums-select" class="fusion-select" data-stem="drums"></select>
-                </div>
-                <div class="form-group">
-                    <label for="bass-select">Bass</label>
-                    <select id="bass-select" class="fusion-select" data-stem="bass"></select>
-                </div>
-                <div class="form-group">
-                    <label for="other-select">Other</label>
-                    <select id="other-select" class="fusion-select" data-stem="other"></select>
-                </div>
+            <div class="fusion-grid" id="fusion-grid">
             </div>
             
             <button class="btn" id="fuse-btn">Fuse Tracks</button>
@@ -334,7 +318,6 @@
         const fileQueueList = document.getElementById('file-queue');
         const allResultsContainer = document.getElementById('all-results-container');
 
-        // --- NEW FUSION ELEMENTS ---
         const fusionPad = document.getElementById('fusion-pad');
         const fuseBtn = document.getElementById('fuse-btn');
         const fuseProgressLog = document.getElementById('fuse-progress-log');
@@ -344,8 +327,8 @@
         let fileQueue = [];
         let isProcessing = false;
         let activePlayers = [];
-        let processedSongs = {}; // NEW: Will store { unique_id: { original_filename, model, components } }
-        let fusedPlayer = null;  // NEW: To hold the final fused player
+        let processedSongs = {};
+        let fusedPlayer = null;
 
         fileUploadArea.addEventListener('click', () => fileInput.click());
         
@@ -387,11 +370,17 @@
             if (!isError) {
                 processingSection.style.display = 'none';
             }
+            
+            // This is now handled by the submit button
+            // activePlayers.forEach(player => {
+            //     if (player) player.destroy();
+            // });
+            // activePlayers = [];
+
             progressLog.textContent += `\n\n${message}`;
             progressLog.scrollTop = progressLog.scrollHeight;
             isProcessing = false;
             
-            // NEW: Hide fusion pad, clear fused player
             fusionPad.style.display = 'none';
             if (fusedPlayer) {
                 fusedPlayer.destroy();
@@ -411,7 +400,6 @@
             submitBtn.textContent = 'Processing...';
             allResultsContainer.innerHTML = '';
 
-            // NEW: Clear all old data
             processedSongs = {}; 
             fusionPad.style.display = 'none';
             if (fusedPlayer) {
@@ -432,7 +420,7 @@
             if (fileQueue.length === 0) {
                 resetUI("All files processed.", false);
                 updateQueueUI();
-                showFusionPad(); // <-- NEW: Show the pad when queue is done
+                showFusionPad(); // <-- Show the pad when queue is done
                 return;
             }
 
@@ -453,7 +441,7 @@
             };
 
             let uniqueFilename = '';
-            let originalFilename = ''; // <-- NEW
+            let originalFilename = '';
 
             try {
                 const response = await fetch('/process', { method: 'POST', body: formData, signal: controller.signal });
@@ -475,9 +463,9 @@
                         if (line.startsWith('data:')) {
                             const data = line.substring(5).trim();
                             if (data.startsWith('SEPARATION_COMPLETE::')) {
-                                const parts = data.split('::'); // <-- UPDATED
+                                const parts = data.split('::');
                                 uniqueFilename = parts[1];
-                                originalFilename = parts[2]; // <-- NEW
+                                originalFilename = parts[2];
                                 break;
                             } else if (data.startsWith('ERROR::')) {
                                 throw new Error(data.split('::')[1]);
@@ -492,13 +480,12 @@
                     if (uniqueFilename) break;
                 }
 
-                // Fetch and display results for the completed file
                 const resultsResponse = await fetch('/results-for-file', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         unique_filename: uniqueFilename,
-                        original_filename: originalFilename, // <-- NEW
+                        original_filename: originalFilename,
                         components: formData.get('components'),
                         model: formData.get('model')
                     })
@@ -511,7 +498,6 @@
                 const resultsData = await resultsResponse.json();
                 allResultsContainer.insertAdjacentHTML('beforeend', resultsData.html);
                 
-                // --- NEW: Store song data ---
                 processedSongs[uniqueFilename] = {
                     original_filename: originalFilename,
                     model: formData.get('model'),
@@ -535,22 +521,66 @@
             processQueue();
         }
 
-        // --- NEW FUNCTION: showFusionPad ---
+        // --- *** THIS IS THE UPDATED FUNCTION *** ---
         function showFusionPad() {
             if (Object.keys(processedSongs).length < 1) {
                 return; // Don't show the pad if no songs were processed
             }
 
+            // 1. Get the component setting from the first processed song
+            // We assume all songs in the batch have the same setting
+            const firstSongId = Object.keys(processedSongs)[0];
+            const components = processedSongs[firstSongId].components; // This will be 4, 6, or 8
+
+            // 2. Define the stem lists based on the component count
+            let stems = [];
+            if (components === 4) {
+                stems = ["vocals", "drums", "bass", "other"];
+            } else if (components === 6) {
+                stems = ["vocals", "drums", "bass", "piano", "guitar", "other"];
+            } else if (components === 8) {
+                // The 8-component separation gives 10 total stems
+                stems = [
+                    "vocals", "drums", "bass", "other",
+                    "lead_vocals", "harmony", "kick_snare", "cymbals", "piano", "guitar"
+                ];
+            }
+
+            // 3. Clear and build the fusion grid
+            const fusionGrid = document.getElementById('fusion-grid');
+            fusionGrid.innerHTML = '';
+            
+            stems.forEach(stem => {
+                // "kick_snare" -> "Kick Snare"
+                const prettyName = stem.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); 
+
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                
+                const label = document.createElement('label');
+                label.htmlFor = `${stem}-select`;
+                label.textContent = prettyName;
+                
+                const select = document.createElement('select');
+                select.id = `${stem}-select`;
+                select.className = 'fusion-select';
+                select.dataset.stem = stem; // This is the key: "vocals", "kick_snare", etc.
+                
+                formGroup.appendChild(label);
+                formGroup.appendChild(select);
+                fusionGrid.appendChild(formGroup);
+            });
+
+            // 4. Now, populate the dropdowns (the rest of the original function)
             fusionPad.style.display = 'block';
             fuseProgressLog.style.display = 'none';
             fuseProgressLog.textContent = '';
             
-            // Clear old options
             masterTempoSelect.innerHTML = '';
-            const stemSelects = document.querySelectorAll('.fusion-select[data-stem]');
+            // Find all the dropdowns we just created
+            const stemSelects = document.querySelectorAll('.fusion-select[data-stem]'); 
             stemSelects.forEach(sel => sel.innerHTML = '');
 
-            // Create a "None" option for stems
             const noneOption = document.createElement('option');
             noneOption.value = '';
             noneOption.textContent = 'None (Silence)';
@@ -566,8 +596,10 @@
                 stemSelects.forEach(select => {
                     const stemOption = document.createElement('option');
                     stemOption.value = unique_id;
-                    stemOption.textContent = `${select.dataset.stem.charAt(0).toUpperCase() + select.dataset.stem.slice(1)} from: ${songData.original_filename}`;
-                    select.appendChild(stemOption);
+                    // Get the label text (e.g., "Kick Snare")
+                    const labelText = select.previousSibling.textContent; 
+                    stemOption.textContent = `${labelText} from: ${songData.original_filename}`;
+                    select.appendChild(stemOption.cloneNode(true));
                 });
             }
             
@@ -575,7 +607,7 @@
             stemSelects.forEach(sel => sel.appendChild(noneOption.cloneNode(true)));
         }
 
-        // --- NEW FUNCTION: handleFuseSubmit ---
+        // --- handleFuseSubmit (Unchanged) ---
         async function handleFuseSubmit(event) {
             event.preventDefault();
             fuseBtn.disabled = true;
@@ -625,7 +657,6 @@
                 
                 if (result.success) {
                     fuseProgressLog.textContent = 'Fusion complete! Loading player...';
-                    // Create a new results_partial.html-style block for the fused track
                     const fusedHtml = `
                         <div class="results">
                             <h2>Your Fused Track</h2>
@@ -648,7 +679,6 @@
                     `;
                     fusedResultContainer.innerHTML = fusedHtml;
                     
-                    // Initialize just the new player
                     const newPlayerEl = fusedResultContainer.querySelector('.stem-player');
                     initializeSingleWaveform(newPlayerEl, true); // 'true' marks it as the main fused player
                     
@@ -666,14 +696,9 @@
             }
         }
         
-        // --- ADD EVENT LISTENER ---
-        fuseBtn.addEventListener('submit', handleFuseSubmit);
-        // This is a common mistake! The button is type="button" (default) or "submit"
-        // but it's inside a div, not a form. We should listen for 'click'.
         fuseBtn.addEventListener('click', handleFuseSubmit);
 
-
-        // --- UPDATED: initializeWaveforms ---
+        // --- (Unchanged) ---
         function initializeWaveforms() {
             const players = document.querySelectorAll('.stem-player:not(.initialized)');
             players.forEach(player => {
@@ -681,8 +706,6 @@
             });
         }
         
-        // --- NEW: initializeSingleWaveform ---
-        // We split this out so we can initialize the fused player separately
         function initializeSingleWaveform(playerEl, isFusedPlayer) {
             playerEl.classList.add('initialized');
             const audioPath = playerEl.dataset.audioPath;
@@ -702,9 +725,9 @@
             waveSurfer.load(audioPath);
             
             if (isFusedPlayer) {
-                fusedPlayer = waveSurfer; // Store reference to this player
+                fusedPlayer = waveSurfer;
             } else {
-                activePlayers.push(waveSurfer); // Store reference to stem players
+                activePlayers.push(waveSurfer);
             }
 
             waveSurfer.on('ready', () => { playBtn.disabled = false; });
@@ -716,7 +739,6 @@
             });
 
             playBtn.addEventListener('click', () => {
-                // Pause all other players
                 const playersToPause = isFusedPlayer ? activePlayers : [fusedPlayer, ...activePlayers.filter(p => p !== waveSurfer)];
                 playersToPause.forEach(p => {
                     if (p && p.isPlaying()) p.pause();
