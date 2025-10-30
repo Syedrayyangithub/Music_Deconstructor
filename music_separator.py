@@ -18,33 +18,25 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_th
     Enhance audio using librosa for better quality
     """
     try:
-        # Load audio file
         y, sr = librosa.load(input_file, sr=None)
-
-        # Trim silence from the beginning and end of ALL stems
         y_trimmed, index = librosa.effects.trim(y, top_db=silence_threshold_db)
 
-        # If the entire clip is silent, don't create an output file.
         if y_trimmed.size == 0:
             print(f"   Skipping empty file: {Path(input_file).name}")
-            return False # Indicate that no file was written
+            return False
         
         if enhancement_type == "vocals":
-            # Enhance vocals: reduce noise, normalize, and boost clarity
             y_normalized = librosa.util.normalize(y_trimmed)
             y_enhanced = np.tanh(y_normalized * 1.2) * 0.8
             y_enhanced = librosa.effects.preemphasis(y_enhanced, coef=0.97)
-            
         elif enhancement_type == "drums":
             y_normalized = librosa.util.normalize(y_trimmed)
             y_enhanced = y_normalized * 1.3
             y_enhanced = np.tanh(y_enhanced * 1.1) * 0.9
-            
         elif enhancement_type == "bass":
             y_normalized = librosa.util.normalize(y_trimmed)
             y_enhanced = y_normalized * 1.4
             y_enhanced = np.tanh(y_enhanced * 1.2) * 0.8
-            
         else:  # other instruments
             y_normalized = librosa.util.normalize(y_trimmed)
             y_enhanced = y_normalized * 1.1
@@ -61,16 +53,9 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_th
 def _get_enhancement_map():
     """Returns a mapping of stem names to enhancement types."""
     return {
-        "vocals": "vocals",
-        "drums": "drums",
-        "bass": "bass",
-        "other": "other",
-        "piano": "other",
-        "guitar": "other",
-        "lead_vocals": "vocals",
-        "harmony": "vocals",
-        "kick_snare": "drums",
-        "cymbals": "drums"
+        "vocals": "vocals", "drums": "drums", "bass": "bass", "other": "other",
+        "piano": "other", "guitar": "other", "lead_vocals": "vocals",
+        "harmony": "vocals", "kick_snare": "drums", "cymbals": "drums"
     }
 
 def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_target=None, job_id: Optional[str] = None, progress_callback: Optional[Callable[[str], None]] = None):
@@ -79,9 +64,7 @@ def _run_demucs(venv_python, input_file, output_dir, model, device, two_stems_ta
     """
     command = [
         venv_python, "-m", "demucs",
-        "-n", model,
-        "-d", device,
-        "-o", output_dir,
+        "-n", model, "-d", device, "-o", output_dir,
     ]
     if two_stems_target:
         command.extend(["--two-stems", two_stems_target])
@@ -120,12 +103,6 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
     Ultra audio separation with multiple component options and enhancement
     """
     print(f" Starting ULTRA {components}-component separation for: {input_file}")
-    print(f" Output directory: {output_dir}")
-    print(f" Model: {model if components != 8 else 'htdemucs_ft (forced)'}")
-    print(f" Device: {device}")
-    print(f" Components: {components}")
-    print(f" Audio Enhancement: {'ON' if enhance else 'OFF'}")
-    print("-" * 70)
     
     os.makedirs(output_dir, exist_ok=True)
     
@@ -142,10 +119,8 @@ def separate_audio_ultra(input_file, output_dir="output_demucs", model="htdemucs
         
         if components == 4:
             yield from _separate_4_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
-            
         elif components == 6:
             yield from _separate_6_components(venv_python, input_file, output_dir, model, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
-            
         elif components == 8:
             yield from _separate_8_components(venv_python, input_file, output_dir, device, enhance, silence_threshold_db, job_id, progress_callback=progress_callback)
         
@@ -174,8 +149,8 @@ def _separate_6_components(venv_python, input_file, output_dir, model, device, e
     if progress_callback: yield progress_callback("Running 6-component separation (Pass 1/2)...")
     
     yield from _run_demucs(venv_python, input_file, output_dir, model, device, job_id=job_id, progress_callback=progress_callback)
-    
-    base_name = Path(input_file).stem 
+
+    base_name = Path(input_file).stem
     track_dir = os.path.join(output_dir, model, base_name)
     other_file = os.path.join(track_dir, "other.wav")
     
@@ -207,16 +182,14 @@ def _separate_8_components(venv_python, input_file, output_dir, device, enhance,
 
     if progress_callback: yield progress_callback("Pass 2/2: Advanced component separation...")
     stems_to_separate = {
-        "vocals": "advanced_vocals",
-        "drums": "advanced_drums",
-        "other": "advanced_other"
+        "vocals": "advanced_vocals", "drums": "advanced_drums", "other": "advanced_other"
     }
     for stem, adv_dir in stems_to_separate.items():
         stem_file = os.path.join(track_dir, f"{stem}.wav")
         if os.path.exists(stem_file):
             yield from _run_demucs(venv_python, stem_file, os.path.join(output_dir, adv_dir), best_model, device, stem, job_id=f"{job_id}-{stem}", progress_callback=progress_callback)
 
-    create_8_component_structure_direct(track_dir, output_dir, base_name)
+    create_8_component_structure_direct(track_dir, output_dir, base_name, best_model)
     if enhance:
         if progress_callback: yield progress_callback("Enhancing audio quality...")
         enhance_8_components(input_file, output_dir, silence_threshold_db)
@@ -241,10 +214,8 @@ def enhance_4_components(input_file, output_dir, model="htdemucs", silence_thres
                 os.remove(input_path)
                 os.rename(temp_enhanced_path, input_path)
             else:
-                # *** THIS IS THE FIX ***
-                # We do NOT delete the original file.
                 print(f"   Skipped empty {filename} (after trimming), original file kept.")
-                if os.path.exists(temp_enhanced_path): # Clean up temp file
+                if os.path.exists(temp_enhanced_path):
                     os.remove(temp_enhanced_path)
 
 def enhance_6_components(input_file, output_dir, silence_threshold_db: int = 30):
@@ -267,7 +238,6 @@ def enhance_6_components(input_file, output_dir, silence_threshold_db: int = 30)
                 os.remove(input_path)
                 os.rename(temp_enhanced_path, input_path)
             else:
-                # *** THIS IS THE FIX ***
                 print(f"   Skipped empty {filename} (after trimming), original file kept.")
                 if os.path.exists(temp_enhanced_path):
                     os.remove(temp_enhanced_path)
@@ -281,7 +251,12 @@ def enhance_8_components(input_file, output_dir, silence_threshold_db: int = 30)
     if not os.path.exists(track_dir):
         return
 
-    for stem_name in enhancement_map.keys():
+    stems_to_enhance = [
+        "vocals", "drums", "bass", "other",
+        "lead_vocals", "harmony", "kick_snare", "cymbals", "piano", "guitar"
+    ]
+
+    for stem_name in stems_to_enhance:
         filename = f"{stem_name}.wav"
         input_path = os.path.join(track_dir, filename)
         if os.path.exists(input_path):
@@ -292,7 +267,6 @@ def enhance_8_components(input_file, output_dir, silence_threshold_db: int = 30)
                 os.remove(input_path)
                 os.rename(temp_enhanced_path, input_path)
             else:
-                # *** THIS IS THE FIX ***
                 print(f"   Skipped empty {filename} (after trimming), original file kept.")
                 if os.path.exists(temp_enhanced_path):
                     os.remove(temp_enhanced_path)
@@ -329,7 +303,7 @@ def _copy_and_log(src_path, dst_path):
         shutil.copy(src_path, dst_path)
         print(f" Created {Path(dst_path).name}")
 
-def create_8_component_structure_direct(track_dir, output_dir, base_name):
+def create_8_component_structure_direct(track_dir, output_dir, base_name, model_for_advanced_stems):
     """Create 8-component structure using direct separation"""
     final_dir = os.path.join(output_dir, "8_components", base_name)
     os.makedirs(final_dir, exist_ok=True)
@@ -339,12 +313,12 @@ def create_8_component_structure_direct(track_dir, output_dir, base_name):
         (track_dir, "drums.wav", "drums.wav"),
         (track_dir, "bass.wav", "bass.wav"),
         (track_dir, "other.wav", "other.wav"),
-        (os.path.join(output_dir, "advanced_vocals", "htdemucs_ft", "vocals"), "vocals.wav", "lead_vocals.wav"),
-        (os.path.join(output_dir, "advanced_vocals", "htdemucs_ft", "vocals"), "no_vocals.wav", "harmony.wav"),
-        (os.path.join(output_dir, "advanced_drums", "htdemucs_ft", "drums"), "drums.wav", "kick_snare.wav"),
-        (os.path.join(output_dir, "advanced_drums", "htdemucs_ft", "drums"), "no_drums.wav", "cymbals.wav"),
-        (os.path.join(output_dir, "advanced_other", "htdemucs_ft", "other"), "other.wav", "piano.wav"),
-        (os.path.join(output_dir, "advanced_other", "htdemucs_ft", "other"), "no_other.wav", "guitar.wav"),
+        (os.path.join(output_dir, "advanced_vocals", model_for_advanced_stems, "vocals"), "vocals.wav", "lead_vocals.wav"),
+        (os.path.join(output_dir, "advanced_vocals", model_for_advanced_stems, "vocals"), "no_vocals.wav", "harmony.wav"),
+        (os.path.join(output_dir, "advanced_drums", model_for_advanced_stems, "drums"), "drums.wav", "kick_snare.wav"),
+        (os.path.join(output_dir, "advanced_drums", model_for_advanced_stems, "drums"), "no_drums.wav", "cymbals.wav"),
+        (os.path.join(output_dir, "advanced_other", model_for_advanced_stems, "other"), "other.wav", "piano.wav"),
+        (os.path.join(output_dir, "advanced_other", model_for_advanced_stems, "other"), "no_other.wav", "guitar.wav"),
     ]
 
     for src_dir, src_filename, dst_filename in file_map:
@@ -407,7 +381,7 @@ def print_ultra_components_info(input_file, output_dir, components, model):
     print(f" ULTRA {components}-COMPONENT SEPARATION RESULTS:")
     print("=" * 70)
     
-    track_dir = "" # Initialize
+    track_dir = ""
     components_info = []
 
     if components == 4:
@@ -418,7 +392,6 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" BASS", "Bass guitar and low-frequency instruments", "bass.wav"),
             (" OTHER", "Piano, guitar, synths, strings, etc.", "other.wav")
         ]
-        
     elif components == 6:
         track_dir = os.path.join(output_dir, "6_components", base_name)
         components_info = [
@@ -429,7 +402,6 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" GUITAR", "Electric and acoustic guitars", "guitar.wav"),
             (" OTHER", "Brass, strings, synths, etc.", "other.wav")
         ]
-
     elif components == 8:
         track_dir = os.path.join(output_dir, "8_components", base_name)
         components_info = [
@@ -445,7 +417,7 @@ def print_ultra_components_info(input_file, output_dir, components, model):
             (" GUITAR", "Electric and acoustic guitars", "guitar.wav")
         ]
     
-    if track_dir: # Ensure track_dir was set
+    if track_dir:
         for emoji, description, filename in components_info:
             _print_component_info(track_dir, emoji, description, filename)
         print(f"\n All files saved in: {track_dir}")
@@ -482,7 +454,6 @@ def main():
     print(f" Silence Trim Threshold: {args.silence_threshold} dB")
     print("=" * 70)
     
-
     for _ in separate_audio_ultra(
         args.input, 
         args.output, 
@@ -496,8 +467,8 @@ def main():
         pass
     
     print("\n Separation process finished.")
-    
+
 main.parser = None
 
 if __name__ == "__main__":
-    main()
+    main() 

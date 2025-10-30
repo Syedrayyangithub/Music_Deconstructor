@@ -43,13 +43,13 @@ def process():
     components = int(request.form.get('components'))
     model = request.form.get('model')
     enhance = request.form.get('enhance') == 'on'
-    silence_threshold_db = int(request.form.get('silence_threshold_db', 30)) # Default to 30 if not provided
+    silence_threshold_db = int(request.form.get('silence_threshold_db', 30))
     
     session['last_file'] = {
         "filename": unique_filename,
         "components": components,
         "model": model,
-        "silence_threshold_db": silence_threshold_db # Store in session
+        "silence_threshold_db": silence_threshold_db
     }
 
     output_dir_for_later = current_app.config['OUTPUT_FOLDER']
@@ -58,17 +58,16 @@ def process():
         try:
             for progress_line in separate_audio_ultra(
                 input_path,
-                output_dir=output_dir,  # Use the passed-in variable
+                output_dir=output_dir,
                 model=model,
                 components=components,
                 enhance=enhance,
-                silence_threshold_db=silence_threshold_db, # Pass the new parameter
+                silence_threshold_db=silence_threshold_db,
                 progress_callback=lambda line: f"data: {line}\n\n"
             ):
                 if progress_line:
                     yield progress_line
 
-            # For batch processing, send back the unique filename so the client can fetch results.
             yield f"data: SEPARATION_COMPLETE::{unique_filename}\n\n"
             
         except Exception as e:
@@ -105,7 +104,7 @@ def results_for_file():
     results = get_separation_results(
         input_path,
         current_app.config['OUTPUT_FOLDER'],
-        int(data.get('components')),
+        int(data.get('components')), # Convert string from JS to int
         data.get('model')
     )
     original_filename = unique_filename.split('_', 1)[-1]
@@ -115,6 +114,11 @@ def results_for_file():
 @app.route('/download/<path:filepath>')
 def download_file(filepath):
     return send_from_directory(current_app.config['OUTPUT_FOLDER'], filepath, as_attachment=True)
+
+@app.route('/play/<path:filepath>')
+def play_file(filepath):
+    """Serves an audio file for in-browser playback."""
+    return send_from_directory(current_app.config['OUTPUT_FOLDER'], filepath)
 
 @app.route('/clear-files', methods=['POST'])
 def clear_files():
@@ -136,7 +140,7 @@ def clear_files():
                 print(f"Failed to delete {item_path}. Reason: {e}")
                 flash(f"Error deleting some files: {e}", "error")
 
-    session.pop('last_file', None) # Clear session to prevent showing old results
+    session.pop('last_file', None)
     flash("All temporary files and outputs have been cleared.", "success")
     return redirect(url_for('index'))
 
@@ -150,7 +154,7 @@ def cancel_process():
     job_id = last_file_info['filename']
     process_to_kill = ACTIVE_PROCESSES.get(job_id)
 
-    if process_to_kill and process_to_kill.poll() is None: # Check if process exists and is running
+    if process_to_kill and process_to_kill.poll() is None:
         process_to_kill.kill()
         return {"status": "success", "message": f"Process {job_id} cancelled."}, 200
     
