@@ -1,4 +1,8 @@
-<div class="results">
+<div class="results" 
+     data-unique-filename="{{ unique_filename }}" 
+     data-model="{{ model }}" 
+     data-components="{{ components }}">
+    
     <h2>Results for: {{ filename }}</h2>
     <ul>
         {% for file in results %}
@@ -17,4 +21,4 @@
         </li>
         {% endfor %}
     </ul>
-</div> 
+</div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Deconstructor</title>
+    <title>Music Deconstructor & Fusion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
@@ -123,26 +123,8 @@
         .results .download-btn { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s, color 0.3s; font-weight: 500; flex-shrink: 0; }
         .results .download-btn:hover { background-color: var(--primary-color); color: var(--bg-color); }
 
-        .stem-player {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            width: 100%;
-        }
-        .play-pause-btn {
-            background: none;
-            border: 2px solid var(--text-secondary);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: border-color 0.3s;
-            padding: 0;
-            flex-shrink: 0;
-        }
+        .stem-player { display: flex; align-items: center; gap: 15px; width: 100%; }
+        .play-pause-btn { background: none; border: 2px solid var(--text-secondary); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: border-color 0.3s; padding: 0; flex-shrink: 0; }
         .play-pause-btn:hover { border-color: var(--primary-color); }
         .play-pause-btn:disabled { border-color: var(--border-color); cursor: not-allowed; }
         .play-pause-btn svg { stroke: var(--text-secondary); transition: stroke 0.3s; }
@@ -158,39 +140,47 @@
 
         #all-results-container .results { margin-top: 20px; border-top: 2px solid var(--border-color); padding-top: 20px; }
 
-        .button-group {
-            display: flex;
-            gap: 10px;
+        .button-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-secondary { background-color: var(--surface-color); color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background-color: var(--border-color); color: var(--text-color); }
+        .form-check { display: flex; align-items: center; gap: 10px; }
+        .form-check-input { width: auto; margin: 0; }
+        .form-check-label { margin-bottom: 0; font-weight: normal; color: var(--text-color); }
+        .form-text.text-muted { font-size: 0.85rem; color: var(--text-secondary); }
+        .d-block { display: block; }
+
+        /* --- NEW FUSION STYLES --- */
+        .fusion-pad {
+            margin-top: 40px;
+            padding: 30px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+        }
+        .fusion-pad h3 {
+            text-align: center;
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+        .fusion-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        #fuse-progress-log {
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
             margin-top: 20px;
         }
-        .btn-secondary {
-            background-color: var(--surface-color);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
+        #fused-result-container .results {
+            border-top: 2px solid var(--primary-color);
         }
-        .btn-secondary:hover {
-            background-color: var(--border-color);
-            color: var(--text-color);
-        }
-        .form-check {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .form-check-input {
-            width: auto;
-            margin: 0;
-        }
-        .form-check-label {
-            margin-bottom: 0;
-            font-weight: normal;
-            color: var(--text-color);
-        }
-        .form-text.text-muted {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        .d-block { display: block; }
+
     </style>
 </head>
 <body>
@@ -199,7 +189,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--primary-color);"><path d="M2 10v3M6 7v10M10 4v16M14 7v10M18 10v3M22 10v3"></path></svg>
             <h1>Music Deconstructor</h1>
         </div>
-        <p class="subtitle">Separate any song into its instrumental stems using AI.</p>
+        <p class="subtitle">Separate songs and fuse them into new creations.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -215,16 +205,16 @@
 
         <form id="upload-form" method="POST" enctype="multipart/form-data">
             <div class="form-group">
-                <label for="file-input">Upload Audio File</label>
+                <label for="file-input">Upload Audio Files</label>
                 <div class="file-upload-wrapper" id="file-upload-area">
                     <svg class="file-upload-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    <p>Drag & drop your file here, or click to select</p>
+                    <p>Drag & drop your songs here, or click to select</p>
                     <p id="filename-display"></p>
                 </div>
             </div>
 
             <div class="form-group">
-                <label for="components">Number of Stems</label>
+                <label for="components">Number of Stems (for all files)</label>
                 <select name="components" id="components">
                     <option value="4">4 (Vocals, Drums, Bass, Other)</option>
                     <option value="6">6 (Vocals, Drums, Bass, Piano, Guitar, Other)</option>
@@ -233,7 +223,7 @@
             </div>
 
             <div class="form-group">
-                <label for="model">Separation Model</label>
+                <label for="model">Separation Model (for all files)</label>
                 <select name="model" id="model">
                     <option value="htdemucs">htdemucs (Balanced)</option>
                     <option value="mdx_extra">mdx_extra (High Quality)</option>
@@ -245,14 +235,14 @@
                 <input type="checkbox" class="form-check-input" id="enhance-checkbox" name="enhance" checked>
                 <label class="form-check-label" for="enhance-checkbox">Enhance Audio Quality</label>
                 <small class="form-text text-muted d-block">
-                Applies effects like normalization and compression to improve clarity. (Adds processing time)
+                Applies effects to improve clarity. (Adds processing time)
                 </small>
             </div>
 
             <div class="form-group">
                 <label for="silence-threshold">Silence Trimming Sensitivity (dB)</label>
                 <input type="number" id="silence-threshold" name="silence_threshold_db" min="0" max="60" value="30">
-                <small class="form-text text-muted">Higher values (e.g., 40-60) trim more aggressively. Lower values (e.g., 10-20) preserve more quiet audio.</small>
+                <small class="form-text text-muted">Higher values (e.g., 40-60) trim more aggressively.</small>
             </div>
 
             <div class="button-group">
@@ -260,7 +250,7 @@
             </div>
         </form>
 
-        <form action="{{ url_for('clear_files') }}" method="POST" class="button-group" onsubmit="return confirm('Are you sure you want to delete all uploaded and processed files? This cannot be undone.');">
+        <form action="{{ url_for('clear_files') }}" method="POST" class="button-group" onsubmit="return confirm('Are you sure you want to delete all files? This cannot be undone.');">
             <button type="submit" class="btn btn-secondary" id="clear-btn">Clear All Files</button>
         </form>
 
@@ -275,7 +265,44 @@
             <div id="progress-log"></div>
         </div>
 
-        <div id="all-results-container"></div>
+        <div id="all-results-container">
+            </div>
+
+        <div class="fusion-pad" id="fusion-pad" style="display: none;">
+            <h3>Music Fusion Pad</h3>
+            <p class="subtitle">Mix and match the stems you just created!</p>
+            
+            <div class="form-group">
+                <label for="master-tempo">Master Tempo</label>
+                <select id="master-tempo-select" class="fusion-select"></select>
+            </div>
+            
+            <div class="fusion-grid">
+                <div class="form-group">
+                    <label for="vocals-select">Vocals</label>
+                    <select id="vocals-select" class="fusion-select" data-stem="vocals"></select>
+                </div>
+                <div class="form-group">
+                    <label for="drums-select">Drums</label>
+                    <select id="drums-select" class="fusion-select" data-stem="drums"></select>
+                </div>
+                <div class="form-group">
+                    <label for="bass-select">Bass</label>
+                    <select id="bass-select" class="fusion-select" data-stem="bass"></select>
+                </div>
+                <div class="form-group">
+                    <label for="other-select">Other</label>
+                    <select id="other-select" class="fusion-select" data-stem="other"></select>
+                </div>
+            </div>
+            
+            <button class="btn" id="fuse-btn">Fuse Tracks</button>
+            <div id="fuse-progress-log" style="display: none; font-family: 'Courier New'; white-space: pre-wrap; margin-top: 15px;"></div>
+        </div>
+        
+        <div id="fused-result-container">
+            </div>
+
 
         {% if results %}
         <div class="results">
@@ -307,19 +334,26 @@
         const fileQueueList = document.getElementById('file-queue');
         const allResultsContainer = document.getElementById('all-results-container');
 
+        // --- NEW FUSION ELEMENTS ---
+        const fusionPad = document.getElementById('fusion-pad');
+        const fuseBtn = document.getElementById('fuse-btn');
+        const fuseProgressLog = document.getElementById('fuse-progress-log');
+        const fusedResultContainer = document.getElementById('fused-result-container');
+        const masterTempoSelect = document.getElementById('master-tempo-select');
+
         let fileQueue = [];
         let isProcessing = false;
         let activePlayers = [];
+        let processedSongs = {}; // NEW: Will store { unique_id: { original_filename, model, components } }
+        let fusedPlayer = null;  // NEW: To hold the final fused player
 
         fileUploadArea.addEventListener('click', () => fileInput.click());
         
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             fileUploadArea.addEventListener(eventName, preventDefaults, false);
         });
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        
         fileUploadArea.addEventListener('drop', handleDrop, false);
         function handleDrop(e) {
             fileQueue.push(...e.dataTransfer.files);
@@ -339,9 +373,7 @@
             fileQueue.forEach((file, index) => {
                 const li = document.createElement('li');
                 li.textContent = file.name;
-                if (isProcessing && index === 0) {
-                    li.className = 'processing';
-                }
+                if (isProcessing && index === 0) li.className = 'processing';
                 fileQueueList.appendChild(li);
             });
             filenameDisplay.textContent = `${fileQueue.length} file(s) in queue.`;
@@ -355,9 +387,17 @@
             if (!isError) {
                 processingSection.style.display = 'none';
             }
-            // progressLog.textContent += `\n\n${message}`;
+            progressLog.textContent += `\n\n${message}`;
             progressLog.scrollTop = progressLog.scrollHeight;
             isProcessing = false;
+            
+            // NEW: Hide fusion pad, clear fused player
+            fusionPad.style.display = 'none';
+            if (fusedPlayer) {
+                fusedPlayer.destroy();
+                fusedPlayer = null;
+            }
+            fusedResultContainer.innerHTML = '';
         }
 
         uploadForm.addEventListener('submit', async function(event) {
@@ -371,8 +411,15 @@
             submitBtn.textContent = 'Processing...';
             allResultsContainer.innerHTML = '';
 
-            // // This is the correct place to clear old players,
-            // right before a new batch starts.
+            // NEW: Clear all old data
+            processedSongs = {}; 
+            fusionPad.style.display = 'none';
+            if (fusedPlayer) {
+                fusedPlayer.destroy();
+                fusedPlayer = null;
+            }
+            fusedResultContainer.innerHTML = '';
+            
             activePlayers.forEach(player => {
                 if (player) player.destroy();
             });
@@ -385,6 +432,7 @@
             if (fileQueue.length === 0) {
                 resetUI("All files processed.", false);
                 updateQueueUI();
+                showFusionPad(); // <-- NEW: Show the pad when queue is done
                 return;
             }
 
@@ -405,6 +453,7 @@
             };
 
             let uniqueFilename = '';
+            let originalFilename = ''; // <-- NEW
 
             try {
                 const response = await fetch('/process', { method: 'POST', body: formData, signal: controller.signal });
@@ -426,7 +475,9 @@
                         if (line.startsWith('data:')) {
                             const data = line.substring(5).trim();
                             if (data.startsWith('SEPARATION_COMPLETE::')) {
-                                uniqueFilename = data.split('::')[1];
+                                const parts = data.split('::'); // <-- UPDATED
+                                uniqueFilename = parts[1];
+                                originalFilename = parts[2]; // <-- NEW
                                 break;
                             } else if (data.startsWith('ERROR::')) {
                                 throw new Error(data.split('::')[1]);
@@ -441,11 +492,13 @@
                     if (uniqueFilename) break;
                 }
 
+                // Fetch and display results for the completed file
                 const resultsResponse = await fetch('/results-for-file', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         unique_filename: uniqueFilename,
+                        original_filename: originalFilename, // <-- NEW
                         components: formData.get('components'),
                         model: formData.get('model')
                     })
@@ -457,6 +510,14 @@
 
                 const resultsData = await resultsResponse.json();
                 allResultsContainer.insertAdjacentHTML('beforeend', resultsData.html);
+                
+                // --- NEW: Store song data ---
+                processedSongs[uniqueFilename] = {
+                    original_filename: originalFilename,
+                    model: formData.get('model'),
+                    components: parseInt(formData.get('components'))
+                };
+                
                 initializeWaveforms();
 
             } catch (err) {
@@ -474,65 +535,207 @@
             processQueue();
         }
 
+        // --- NEW FUNCTION: showFusionPad ---
+        function showFusionPad() {
+            if (Object.keys(processedSongs).length < 1) {
+                return; // Don't show the pad if no songs were processed
+            }
+
+            fusionPad.style.display = 'block';
+            fuseProgressLog.style.display = 'none';
+            fuseProgressLog.textContent = '';
+            
+            // Clear old options
+            masterTempoSelect.innerHTML = '';
+            const stemSelects = document.querySelectorAll('.fusion-select[data-stem]');
+            stemSelects.forEach(sel => sel.innerHTML = '');
+
+            // Create a "None" option for stems
+            const noneOption = document.createElement('option');
+            noneOption.value = '';
+            noneOption.textContent = 'None (Silence)';
+
+            for (const [unique_id, songData] of Object.entries(processedSongs)) {
+                // Add to master tempo select
+                const tempoOption = document.createElement('option');
+                tempoOption.value = unique_id;
+                tempoOption.textContent = `Tempo from: ${songData.original_filename}`;
+                masterTempoSelect.appendChild(tempoOption);
+
+                // Add to each stem select
+                stemSelects.forEach(select => {
+                    const stemOption = document.createElement('option');
+                    stemOption.value = unique_id;
+                    stemOption.textContent = `${select.dataset.stem.charAt(0).toUpperCase() + select.dataset.stem.slice(1)} from: ${songData.original_filename}`;
+                    select.appendChild(stemOption);
+                });
+            }
+            
+            // Add the "None" option to each stem select
+            stemSelects.forEach(sel => sel.appendChild(noneOption.cloneNode(true)));
+        }
+
+        // --- NEW FUNCTION: handleFuseSubmit ---
+        async function handleFuseSubmit(event) {
+            event.preventDefault();
+            fuseBtn.disabled = true;
+            fuseBtn.textContent = 'Fusing...';
+            fuseProgressLog.style.display = 'block';
+            fuseProgressLog.textContent = 'Initializing fusion... (This may take a moment)';
+            
+            if (fusedPlayer) {
+                fusedPlayer.destroy();
+                fusedPlayer = null;
+            }
+            fusedResultContainer.innerHTML = '';
+
+            try {
+                const fusion_map = {};
+                const model_map = {};
+                const components_map = {};
+                
+                document.querySelectorAll('.fusion-select[data-stem]').forEach(sel => {
+                    fusion_map[sel.dataset.stem] = sel.value; // e.g., "vocals": "uuid_of_song_a"
+                });
+
+                for (const [id, data] of Object.entries(processedSongs)) {
+                    model_map[id] = data.model;
+                    components_map[id] = data.components;
+                }
+
+                const payload = {
+                    fusion_map: fusion_map,
+                    model_map: model_map,
+                    components_map: components_map,
+                    master_tempo_song_id: masterTempoSelect.value
+                };
+
+                const response = await fetch('/fuse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || `Server error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    fuseProgressLog.textContent = 'Fusion complete! Loading player...';
+                    // Create a new results_partial.html-style block for the fused track
+                    const fusedHtml = `
+                        <div class="results">
+                            <h2>Your Fused Track</h2>
+                            <ul>
+                                <li>
+                                    <div class="stem-player" data-audio-path="/play/${result.path}">
+                                        <button class="play-pause-btn" disabled>
+                                            <svg class="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                            <svg class="pause-icon" style="display:none;" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                        </button>
+                                        <div class="stem-details">
+                                            <span class="stem-name">${result.filename}</span>
+                                            <div class="waveform-container"></div>
+                                        </div>
+                                    </div>
+                                    <a href="/download/${result.path}" class="download-btn">Download</a>
+                                </li>
+                            </ul>
+                        </div>
+                    `;
+                    fusedResultContainer.innerHTML = fusedHtml;
+                    
+                    // Initialize just the new player
+                    const newPlayerEl = fusedResultContainer.querySelector('.stem-player');
+                    initializeSingleWaveform(newPlayerEl, true); // 'true' marks it as the main fused player
+                    
+                    fuseBtn.disabled = false;
+                    fuseBtn.textContent = 'Fuse Tracks';
+                    fuseProgressLog.style.display = 'none';
+                } else {
+                    throw new Error(result.error || "Unknown error during fusion.");
+                }
+
+            } catch (err) {
+                fuseProgressLog.textContent = `ERROR: ${err.message}`;
+                fuseBtn.disabled = false;
+                fuseBtn.textContent = 'Fuse Tracks';
+            }
+        }
+        
+        // --- ADD EVENT LISTENER ---
+        fuseBtn.addEventListener('submit', handleFuseSubmit);
+        // This is a common mistake! The button is type="button" (default) or "submit"
+        // but it's inside a div, not a form. We should listen for 'click'.
+        fuseBtn.addEventListener('click', handleFuseSubmit);
+
+
+        // --- UPDATED: initializeWaveforms ---
         function initializeWaveforms() {
             const players = document.querySelectorAll('.stem-player:not(.initialized)');
             players.forEach(player => {
-                player.classList.add('initialized');
-                const audioPath = player.dataset.audioPath;
-                const waveformContainer = player.querySelector('.waveform-container');
-                const playBtn = player.querySelector('.play-pause-btn');
-                const playIcon = playBtn.querySelector('.play-icon');
-                const pauseIcon = playBtn.querySelector('.pause-icon');
+                initializeSingleWaveform(player, false);
+            });
+        }
+        
+        // --- NEW: initializeSingleWaveform ---
+        // We split this out so we can initialize the fused player separately
+        function initializeSingleWaveform(playerEl, isFusedPlayer) {
+            playerEl.classList.add('initialized');
+            const audioPath = playerEl.dataset.audioPath;
+            const waveformContainer = playerEl.querySelector('.waveform-container');
+            const playBtn = playerEl.querySelector('.play-pause-btn');
+            const playIcon = playBtn.querySelector('.play-icon');
+            const pauseIcon = playBtn.querySelector('.pause-icon');
 
-                const waveSurfer = WaveSurfer.create({
-                    container: waveformContainer,
-                    waveColor: '#555',
-                    progressColor: 'var(--primary-color)',
-                    cursorColor: 'var(--primary-color)',
-                    barWidth: 2,
-                    barRadius: 3,
-                    height: 40,
-                    responsive: true,
-                });
+            const waveSurfer = WaveSurfer.create({
+                container: waveformContainer,
+                waveColor: '#555',
+                progressColor: 'var(--primary-color)',
+                cursorColor: 'var(--primary-color)',
+                barWidth: 2, barRadius: 3, height: 40, responsive: true,
+            });
 
-                waveSurfer.load(audioPath);
-                activePlayers.push(waveSurfer);
+            waveSurfer.load(audioPath);
+            
+            if (isFusedPlayer) {
+                fusedPlayer = waveSurfer; // Store reference to this player
+            } else {
+                activePlayers.push(waveSurfer); // Store reference to stem players
+            }
 
-                waveSurfer.on('ready', () => {
-                    playBtn.disabled = false;
-                });
-                
-                waveSurfer.on('error', (e) => {
-                    console.error('Wavesurfer error:', e);
-                    if (e.name !== 'AbortError') { // Don't show the harmless abort error
-                        waveformContainer.innerHTML = `<span style="color: var(--error-color);">Error loading waveform</span>`;
-                    }
-                });
+            waveSurfer.on('ready', () => { playBtn.disabled = false; });
+            waveSurfer.on('error', (e) => {
+                console.error('Wavesurfer error:', e);
+                if (e.name !== 'AbortError') {
+                    waveformContainer.innerHTML = `<span style="color: var(--error-color);">Error loading waveform</span>`;
+                }
+            });
 
-                playBtn.addEventListener('click', () => {
-                    activePlayers.forEach(p => {
-                        if (p !== waveSurfer && p.isPlaying()) {
-                            p.pause();
-                        }
-                    });
-                    waveSurfer.playPause();
+            playBtn.addEventListener('click', () => {
+                // Pause all other players
+                const playersToPause = isFusedPlayer ? activePlayers : [fusedPlayer, ...activePlayers.filter(p => p !== waveSurfer)];
+                playersToPause.forEach(p => {
+                    if (p && p.isPlaying()) p.pause();
                 });
+                waveSurfer.playPause();
+            });
 
-                waveSurfer.on('play', () => {
-                    playIcon.style.display = 'none';
-                    pauseIcon.style.display = 'block';
-                });
-
-                waveSurfer.on('pause', () => {
-                    playIcon.style.display = 'block';
-                    pauseIcon.style.display = 'none';
-                });
-
-                waveSurfer.on('finish', () => {
-                    waveSurfer.seekTo(0);
-                    playIcon.style.display = 'block';
-                    pauseIcon.style.display = 'none';
-                });
+            waveSurfer.on('play', () => {
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+            });
+            waveSurfer.on('pause', () => {
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+            });
+            waveSurfer.on('finish', () => {
+                waveSurfer.seekTo(0);
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
             });
         }
     </script>
