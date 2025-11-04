@@ -67,7 +67,7 @@ music-separator/
 
 ### 1. Web Application
 
-To run the user-friendly web interface, execute the `app.py` script:
+To run the user-friendly web interface, execute the `app.py` script using the below command:
 
 ```bash
 python app.py
