@@ -1,22 +1,30 @@
 /* --- ROOT VARIABLES --- */
 :root {
-    --bg-color: #121212;
-    --surface-color: #1e1e1e;
-    --primary-color: #1DB954;
-    --primary-hover: #1ED760;
-    --text-color: #FFFFFF;
-    --text-secondary: #B3B3B3;
-    --error-color: #f44336;
-    --border-color: #2c2c2c;
-    --warn-color: #ffc107;
-    --mute-active: #f44336;
+    --bg-color: #121212; /* Keep main body background dark, but the image will dominate */
+    --surface-color: #2e2e2e; /* A slightly lighter, more neutral grey for surfaces */
+    --primary-color: #1ed760; /* Vibrant green from the original Spotify-like theme */
+    --primary-hover: #1db954; /* Darker green for hover, still vibrant */
+    --text-color: #FFFFFF; /* Bright white for primary text */
+    --text-secondary: #B3B3B3; /* Lighter grey for secondary text */
+    --error-color: #ff3333; /* Brighter red for errors */
+    --border-color: #4a4a4a; /* A softer, slightly lighter border color */
+    --warn-color: #ffc107; /* Amber for warnings */
+    --mute-active: #ff3333;
     --solo-active: #ffc107;
 }
 
 /* --- BASE & LAYOUT --- */
 body { 
     font-family: 'Inter', sans-serif; 
-    background-color: var(--bg-color); 
+    
+    /* === BACKGROUND IMAGE (First Collage) === */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('deepaudio_bg.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed; 
+    background-repeat: no-repeat; /* Ensure it doesn't tile if image is smaller */
+    /* === END OF BACKGROUND IMAGE === */
+
     color: var(--text-color); 
     line-height: 1.6; 
     padding: 20px;
@@ -25,26 +33,27 @@ body {
     align-items: flex-start;
     min-height: 100vh;
     margin: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll from background */
 }
+
 .container { 
     width: 100%;
-    max-width: 800px; /* Increased max-width for mixer */
+    max-width: 800px;
     margin: 40px auto; 
     padding: 40px; 
-    background: var(--surface-color); 
+    background: rgba(30, 30, 30, 0.75); /* Slightly transparent dark grey */
     border-radius: 16px; 
     border: 1px solid var(--border-color);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
-    overflow: hidden; /* Contains new animations */
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 15px rgba(30, 215, 96, 0.2); /* Enhanced shadow with green glow */
+    overflow: hidden; 
+    position: relative; /* For potential pseudo-elements or absolute positioning */
 }
 
 /* --- ANIMATED SECTION (NEW) --- */
-/* This class will be added to sections to make them animate in */
 .animated-section {
     opacity: 0;
     transform: translateY(20px);
     transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-    /* We hide with 'display' by default */
     display: none; 
 }
 .animated-section.is-visible {
@@ -60,70 +69,121 @@ body {
     justify-content: center;
     gap: 15px;
     margin-bottom: 10px;
+    position: relative;
+    padding-bottom: 10px; /* Space for the equalizer */
 }
-h1 { 
-    color: var(--text-color); 
+.header h1 { 
+    color: var(--primary-color); /* Title in vibrant green */
     text-align: center; 
     font-weight: 700;
-    font-size: 2.5rem;
+    font-size: 2.8rem; /* Slightly larger title */
     margin: 0;
+    text-shadow: 0 0 8px rgba(30, 215, 96, 0.5); /* Subtle glow for the title */
+}
+.header svg {
+    stroke: var(--primary-color); /* Icon in vibrant green */
 }
 .subtitle {
     text-align: center;
     color: var(--text-secondary);
     margin-bottom: 40px;
+    font-style: italic;
 }
+
+/* --- MUSIC ELEMENTS ON UI (NEW) --- */
+
+/* Animated Equalizer Bar in Header */
+.header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%; /* Width of the equalizer */
+    height: 3px; /* Height of the base line */
+    background: linear-gradient(to right, #00C6FF, #92FE9D); /* A subtle gradient for the bar */
+    border-radius: 5px;
+    opacity: 0.7;
+    animation: pulseEqualizer 2s infinite alternate; /* Simple pulsing animation */
+}
+
+@keyframes pulseEqualizer {
+    0% { transform: translateX(-50%) scaleX(0.9); opacity: 0.7; }
+    50% { transform: translateX(-50%) scaleX(1.0); opacity: 1; }
+    100% { transform: translateX(-50%) scaleX(0.9); opacity: 0.7; }
+}
+
 
 /* --- FORMS & INPUTS --- */
 .form-group { margin-bottom: 20px; }
-label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
+label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-color); /* Labels more visible */ }
 select, input[type="number"] { 
     width: 100%; 
     padding: 12px; 
-    background-color: var(--bg-color);
+    background-color: rgba(0, 0, 0, 0.4); /* Slightly transparent background for inputs */
     color: var(--text-color);
     border: 1px solid var(--border-color); 
     border-radius: 8px; 
     box-sizing: border-box; 
     font-size: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+select:focus, input[type="number"]:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 8px rgba(30, 215, 96, 0.5); /* Green glow on focus */
+    outline: none;
 }
 .form-check { display: flex; align-items: center; gap: 10px; }
-.form-check-input { width: auto; margin: 0; }
+.form-check-input { 
+    width: auto; 
+    margin: 0; 
+    accent-color: var(--primary-color); /* Colors the checkbox itself */
+}
 .form-check-label { margin-bottom: 0; font-weight: normal; color: var(--text-color); }
 .form-text.text-muted { font-size: 0.85rem; color: var(--text-secondary); }
 .d-block { display: block; }
 
 /* --- FILE UPLOAD --- */
 .file-upload-wrapper {
-    border: 2px dashed var(--border-color);
-    border-radius: 8px;
+    border: 2px dashed var(--primary-color); /* Dashed primary color border */
+    border-radius: 12px; /* Slightly more rounded */
     padding: 30px;
     text-align: center;
     cursor: pointer;
     position: relative;
-    transition: border-color 0.3s, background-color 0.3s;
+    transition: border-color 0.3s, background-color 0.3s, box-shadow 0.3s;
+    background-color: rgba(0, 0, 0, 0.3); /* Transparent dark background */
 }
 .file-upload-wrapper:hover {
-    border-color: var(--primary-color);
-    background-color: #2a2a2a;
+    border-color: var(--primary-hover);
+    background-color: rgba(30, 215, 96, 0.1); /* Subtle green tint on hover */
+    box-shadow: 0 0 20px rgba(30, 215, 96, 0.4);
 }
 .file-upload-wrapper.drag-over {
     border-color: var(--primary-hover);
-    background-color: #2a2a2a;
-    box-shadow: 0 0 15px rgba(30, 215, 96, 0.3);
+    background-color: rgba(30, 215, 96, 0.2);
+    box-shadow: 0 0 25px rgba(30, 215, 96, 0.6);
 }
-.file-upload-wrapper input[type="file"] { display: none; }
 .file-upload-icon {
-    stroke: var(--text-secondary);
-    width: 48px;
-    height: 48px;
+    stroke: var(--primary-color); /* Icon matches primary color */
+    width: 50px; /* Slightly larger icon */
+    height: 50px;
     margin-bottom: 15px;
+    animation: floatUpDown 3s ease-in-out infinite; /* Floating animation */
 }
-#filename-display { color: var(--primary-color); font-weight: 500; margin-top: 10px; }
+
+@keyframes floatUpDown {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
+}
+
+#filename-display { color: var(--primary-hover); font-weight: 500; margin-top: 10px; }
 .error-message {
     color: var(--error-color);
     font-size: 0.9rem;
     margin-top: 10px;
+    font-weight: 600;
 }
 
 
@@ -139,40 +199,99 @@ select, input[type="number"] {
     font-size: 1.1rem; 
     font-weight: 700;
     cursor: pointer; 
-    transition: background-color 0.3s; 
+    transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s; 
+    letter-spacing: 0.5px;
 }
-.btn:hover:not(:disabled) { background-color: var(--primary-hover); }
-.btn:disabled { background-color: #535353; color: #a7a7a7; cursor: not-allowed; }
-.button-group { display: flex; gap: 10px; margin-top: 20px; }
-.btn-secondary { background-color: var(--surface-color); color: var(--text-secondary); border: 1px solid var(--border-color); }
-.btn-secondary:hover:not(:disabled) { background-color: var(--border-color); color: var(--text-color); }
+.btn:hover:not(:disabled) { 
+    background-color: var(--primary-hover); 
+    transform: translateY(-2px); 
+    box-shadow: 0 5px 15px rgba(30, 215, 96, 0.4);
+}
+.btn:disabled { 
+    background-color: #535353; 
+    color: #a7a7a7; 
+    cursor: not-allowed; 
+    box-shadow: none;
+    transform: none;
+}
+.button-group { 
+    display: flex; 
+    gap: 10px; 
+    margin-top: 25px; /* More space */
+}
+.btn-secondary { 
+    background-color: var(--surface-color); 
+    color: var(--text-secondary); 
+    border: 1px solid var(--border-color); 
+    box-shadow: none;
+}
+.btn-secondary:hover:not(:disabled) { 
+    background-color: rgba(74, 74, 74, 0.5); /* Slightly lighter transparent grey */
+    color: var(--primary-color); /* Secondary button text gets primary color on hover */
+    border-color: var(--primary-color);
+    box-shadow: 0 3px 10px rgba(74, 74, 74, 0.3);
+}
 
 
 /* --- PROCESSING & QUEUE --- */
-/* Now uses .animated-section */
-.progress-container { margin-top: 20px; background-color: var(--border-color); border-radius: 8px; overflow: hidden; }
-.progress-bar { width: 0%; height: 12px; background-color: var(--primary-color); transition: width 0.4s ease-in-out; border-radius: 8px; }
-#progress-log { margin-top: 15px; background-color: var(--bg-color); color: var(--text-secondary); padding: 15px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; font-size: 0.85rem; border: 1px solid var(--border-color); }
+.progress-container { 
+    margin-top: 20px; 
+    background-color: var(--border-color); 
+    border-radius: 8px; 
+    overflow: hidden; 
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+}
+.progress-bar { 
+    width: 0%; 
+    height: 12px; 
+    background: linear-gradient(to right, #00C6FF, #92FE9D); /* Blue to Green gradient */
+    transition: width 0.4s ease-in-out; 
+    border-radius: 8px; 
+}
+#progress-log { 
+    margin-top: 15px; 
+    background-color: rgba(0, 0, 0, 0.4); /* Transparent dark background */
+    color: var(--text-secondary); 
+    padding: 15px; 
+    border-radius: 8px; 
+    font-family: 'Courier New', Courier, monospace; 
+    white-space: pre-wrap; 
+    word-wrap: break-word; 
+    max-height: 200px; 
+    overflow-y: auto; 
+    font-size: 0.85rem; 
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+}
 #file-queue { list-style: none; padding: 0; margin-top: 20px; }
-#file-queue li { background-color: var(--bg-color); padding: 8px 12px; border-radius: 6px; margin-bottom: 5px; font-size: 0.9rem; color: var(--text-secondary); }
-#file-queue li.processing { color: var(--primary-color); font-weight: 500; }
-#file-queue li.completed { color: #6c757d; text-decoration: line-through; }
+#file-queue li { 
+    background-color: rgba(46, 46, 46, 0.8); /* Slightly transparent for queue items */
+    padding: 8px 12px; 
+    border-radius: 6px; 
+    margin-bottom: 5px; 
+    font-size: 0.9rem; 
+    color: var(--text-secondary); 
+    border: 1px solid rgba(74, 74, 74, 0.5);
+}
+#file-queue li.processing { color: var(--primary-color); font-weight: 600; }
+#file-queue li.completed { color: #888; text-decoration: line-through; }
 
-/* --- *** NEW: SONG CARD RESULTS *** --- */
+/* --- SONG CARD RESULTS --- */
 .song-result-card {
-    background: var(--bg-color);
+    background: rgba(30, 30, 30, 0.75); /* Opaque container for results */
     border: 1px solid var(--border-color);
     border-radius: 12px;
     margin-top: 30px;
     padding: 24px;
-    /* Uses .animated-section for entry */
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
 }
 .song-result-card h2 {
-    font-size: 1.8rem;
+    font-size: 2rem;
     color: var(--primary-color);
     margin: 0 0 20px 0;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 15px;
+    text-shadow: 0 0 5px rgba(30, 215, 96, 0.3);
 }
 .song-result-card ul { list-style: none; padding: 0; }
 .song-result-card li { 
@@ -184,49 +303,74 @@ select, input[type="number"] {
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    transition: background-color 0.3s; 
+    transition: background-color 0.3s, box-shadow 0.3s; 
 }
-.song-result-card li:hover { background-color: #2a2a2a; } 
-.song-result-card .download-btn { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); text-decoration: none; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s, color 0.3s; font-weight: 500; flex-shrink: 0; }
-.song-result-card .download-btn:hover { background-color: var(--primary-color); color: var(--bg-color); }
+.song-result-card li:hover { 
+    background-color: rgba(74, 74, 74, 0.9); 
+    box-shadow: 0 0 10px rgba(74, 74, 74, 0.3);
+} 
+.song-result-card .download-btn { 
+    background-color: transparent; 
+    border: 1px solid var(--primary-color); 
+    color: var(--primary-color); 
+    text-decoration: none; 
+    padding: 8px 16px; 
+    border-radius: 6px; 
+    transition: background-color 0.3s, color 0.3s, box-shadow 0.3s; 
+    font-weight: 500; 
+    flex-shrink: 0; 
+}
+.song-result-card .download-btn:hover { 
+    background-color: var(--primary-color); 
+    color: var(--bg-color); 
+    box-shadow: 0 0 10px rgba(30, 215, 96, 0.5);
+}
 
-/* Original .results styles (for fused track) */
 .results { margin-top: 40px; }
 .results h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 10px; font-size: 1.5rem; }
 .results ul { list-style: none; padding: 0; }
 .results li { background: var(--bg-color); border: 1px solid var(--border-color); padding: 12px 20px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
 .results li:hover { background-color: #2a2a2a; } 
 
-/* --- STEM PLAYER (Unchanged) --- */
+/* --- STEM PLAYER (Unchanged, but colors inherit) --- */
 .stem-player { display: flex; align-items: center; gap: 15px; width: 100%; }
-.play-pause-btn { background: none; border: 2px solid var(--text-secondary); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: border-color 0.3s; padding: 0; flex-shrink: 0; }
-.play-pause-btn:hover { border-color: var(--primary-color); }
-.play-pause-btn:disabled { border-color: var(--border-color); cursor: not-allowed; }
+.play-pause-btn { 
+    background: none; 
+    border: 2px solid var(--text-secondary); 
+    border-radius: 50%; 
+    width: 40px; height: 40px; 
+    display: flex; justify-content: center; align-items: center; 
+    cursor: pointer; 
+    transition: border-color 0.3s, box-shadow 0.3s; 
+    padding: 0; 
+    flex-shrink: 0; 
+}
+.play-pause-btn:hover { border-color: var(--primary-color); box-shadow: 0 0 8px rgba(30, 215, 96, 0.3); }
+.play-pause-btn:disabled { border-color: var(--border-color); cursor: not-allowed; box-shadow: none; }
 .play-pause-btn svg { stroke: var(--text-secondary); transition: stroke 0.3s; }
 .play-pause-btn:hover svg { stroke: var(--primary-color); }
 .stem-details { width: 100%; }
-.stem-name { font-weight: 500; }
-.waveform-container { height: 40px; }
+.stem-name { font-weight: 500; color: var(--text-color); }
+.waveform-container { height: 40px; } /* Wavesurfer will use primary-color */
 
-/* --- *** NEW: FUSION MIXER *** --- */
+/* --- FUSION MIXER --- */
 .fusion-pad {
     margin-top: 40px;
     padding: 30px;
-    background: var(--bg-color);
+    background: rgba(30, 30, 30, 0.75); /* Opaque container */
     border: 1px solid var(--border-color);
     border-radius: 16px;
-    /* Now uses .animated-section */
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
 }
 .fusion-pad h3 {
     text-align: center;
-    font-size: 1.8rem;
+    font-size: 2rem;
     color: var(--primary-color);
     margin-top: 0;
+    text-shadow: 0 0 5px rgba(30, 215, 96, 0.3);
 }
-/* This is the new grid */
 .fusion-mixer {
     display: grid;
-    /* Auto-fit columns, min 110px wide */
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 20px;
     margin-top: 30px;
@@ -241,19 +385,20 @@ select, input[type="number"] {
     padding: 15px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .channel-strip h4 {
     margin: 0 0 10px 0;
     font-size: 1rem;
-    color: var(--text-secondary);
+    color: var(--text-color); /* Stem names brighter */
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 .channel-strip select {
     font-size: 0.85rem;
     padding: 8px;
     margin-bottom: 15px;
 }
-/* Fader (Volume Slider) */
 .fader-container {
     display: flex;
     flex-direction: column;
@@ -271,44 +416,49 @@ select, input[type="number"] {
 input[type="range"].volume-fader {
     -webkit-appearance: none;
     appearance: none;
-    width: 150px; /* Height of the slider track */
-    height: 4px;  /* Width of the slider track */
+    width: 150px;
+    height: 6px; /* Slightly thicker fader track */
     background: var(--border-color);
     border-radius: 5px;
     outline: none;
     cursor: pointer;
+    box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
     
-    /* This transforms it to be vertical */
-    transform-origin: 75px 75px; /* Center of the 150px */
+    transform-origin: 75px 75px; 
     transform: rotate(-90deg);
 }
 input[type="range"].volume-fader::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 16px;
-    height: 16px;
+    width: 20px; /* Larger thumb */
+    height: 20px;
     background: var(--primary-color);
+    border: 2px solid var(--bg-color); /* Dark border for contrast */
     border-radius: 50%;
     cursor: pointer;
-    transition: background-color 0.2s;
-    /* We add a rotation to the thumb to make it appear correct */
+    transition: background-color 0.2s, box-shadow 0.2s;
     transform: rotate(90deg);
+    box-shadow: 0 0 8px rgba(30, 215, 96, 0.5); /* Glow for the thumb */
 }
 input[type="range"].volume-fader:hover::-webkit-slider-thumb {
     background-color: var(--primary-hover);
+    box-shadow: 0 0 12px rgba(30, 215, 96, 0.7);
 }
 /* For Firefox */
 input[type="range"].volume-fader::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     background: var(--primary-color);
+    border: 2px solid var(--bg-color);
     border-radius: 50%;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, box-shadow 0.2s;
     transform: rotate(90deg);
+    box-shadow: 0 0 8px rgba(30, 215, 96, 0.5);
 }
 input[type="range"].volume-fader:hover::-moz-range-thumb {
     background-color: var(--primary-hover);
+    box-shadow: 0 0 12px rgba(30, 215, 96, 0.7);
 }
 
 
@@ -320,41 +470,46 @@ input[type="range"].volume-fader:hover::-moz-range-thumb {
     width: 100%;
 }
 .channel-btn {
-    font-size: 0.9rem;
+    font-size: 0.95rem; /* Slightly larger text */
     font-weight: 700;
     border: 1px solid var(--border-color);
-    background: var(--bg-color);
+    background: rgba(0,0,0,0.4); /* Transparent dark background */
     color: var(--text-secondary);
     padding: 8px;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
+    letter-spacing: 0.2px;
 }
 .channel-btn:hover {
     border-color: var(--text-color);
     color: var(--text-color);
+    box-shadow: 0 0 5px rgba(255,255,255,0.2);
 }
 .channel-btn.mute-btn.active {
     background-color: var(--mute-active);
     border-color: var(--mute-active);
     color: var(--text-color);
+    box-shadow: 0 0 10px rgba(255, 51, 51, 0.6);
 }
 .channel-btn.solo-btn.active {
     background-color: var(--solo-active);
     border-color: var(--solo-active);
     color: var(--bg-color);
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.6);
 }
 
-/* Fusion Log/Results (Unchanged) */
+/* Fusion Log/Results (Unchanged from previous update) */
 #fuse-progress-log {
     font-family: 'Courier New', Courier, monospace;
     color: var(--text-secondary);
     font-size: 0.9rem;
-    background: #000;
+    background: rgba(0, 0, 0, 0.6); /* Slightly transparent */
     padding: 15px;
     border-radius: 8px;
     margin-top: 20px;
     white-space: pre-wrap;
+    border: 1px solid var(--border-color);
 }
 #fused-result-container .results {
     border-top: 2px solid var(--primary-color);
