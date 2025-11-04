@@ -9,21 +9,20 @@ import librosa
 import soundfile as sf
 import shutil
 import numpy as np
-from pydub import AudioSegment # <-- NEW IMPORT
+from pydub import AudioSegment # pydub is key for volume
 
 # A global dictionary to keep track of active subprocesses by a unique job ID
 ACTIVE_PROCESSES = {}
 
 # -----------------------------------------------------------------
-#  NEW FUSION FUNCTIONS
+#  UPDATED FUSION FUNCTIONS
 # -----------------------------------------------------------------
 
 def get_bpm(audio_file) -> float:
-    """Loads an audio file and estimates its BPM."""
+    # ... (This function is unchanged) ...
     try:
         print(f"   Analysing BPM for {audio_file}...")
         y, sr = librosa.load(audio_file, sr=None)
-        # Use a larger hop_length for faster analysis
         onset_env = librosa.onset.onset_detect(y=y, sr=sr, hop_length=1024)
         bpm = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)["bpm"]
         print(f"   Detected BPM: {bpm}")
@@ -33,10 +32,7 @@ def get_bpm(audio_file) -> float:
         return 120.0
 
 def time_stretch_audio(input_file, output_file, target_bpm: float):
-    """
-    Time-stretches an audio file to a target BPM.
-    Returns True on success, False on failure.
-    """
+    # ... (This function is unchanged) ...
     try:
         print(f"   Stretching {Path(input_file).name} to {target_bpm} BPM...")
         y, sr = librosa.load(input_file, sr=None)
@@ -46,9 +42,6 @@ def time_stretch_audio(input_file, output_file, target_bpm: float):
             print("   Source BPM is 0, cannot stretch.")
             return False
 
-        # The 'rate' is the factor by which to speed up or slow down
-        # e.g., target=120, source=60 -> rate=2.0 (speed up)
-        # e.g., target=90, source=120 -> rate=0.75 (slow down)
         stretch_rate = target_bpm / source_bpm
 
         if np.abs(stretch_rate - 1.0) < 0.01:
@@ -65,20 +58,48 @@ def time_stretch_audio(input_file, output_file, target_bpm: float):
         print(f"   Error during time-stretch: {e}")
         return False
 
-def fuse_stems(stem_paths: list, output_file: str):
+def fuse_stems(stems_to_fuse: list, output_file: str):
     """
     Mixes a list of audio file paths into a single output file.
     All stems must be .wav files.
+    'stems_to_fuse' is a list of dicts: [{"path": "...", "volume": 1.0}, ...]
     """
+    # --- *** HEAVILY MODIFIED *** ---
     try:
-        print(f"   Fusing {len(stem_paths)} stems...")
+        print(f"   Fusing {len(stems_to_fuse)} stems with volume...")
         
+        if not stems_to_fuse:
+            print("   No stems to fuse.")
+            return False
+
         # Load the first stem as the base
-        base = AudioSegment.from_wav(stem_paths[0])
+        first_stem_data = stems_to_fuse[0]
+        base = AudioSegment.from_wav(first_stem_data["path"])
+        
+        # Apply volume to the base
+        # Convert linear volume (e.g., 1.0) to dB
+        # A volume of 0 is -infinity dB, so we set a floor
+        if first_stem_data["volume"] == 0:
+            volume_db = -120  # Effective silence
+        else:
+            volume_db = 20 * np.log10(first_stem_data["volume"])
+        
+        print(f"   Applying {volume_db:.2f} dB to {Path(first_stem_data['path']).name}")
+        base = base + volume_db
 
         # Overlay the rest of the stems
-        for path in stem_paths[1:]:
-            stem_to_overlay = AudioSegment.from_wav(path)
+        for stem_data in stems_to_fuse[1:]:
+            stem_to_overlay = AudioSegment.from_wav(stem_data["path"])
+            
+            # Apply volume to this stem
+            if stem_data["volume"] == 0:
+                volume_db = -120
+            else:
+                volume_db = 20 * np.log10(stem_data["volume"])
+            
+            print(f"   Applying {volume_db:.2f} dB to {Path(stem_data['path']).name}")
+            stem_to_overlay = stem_to_overlay + volume_db
+            
             # We assume all stems are the same length after stretching
             base = base.overlay(stem_to_overlay)
         
@@ -91,10 +112,11 @@ def fuse_stems(stem_paths: list, output_file: str):
         return False
 
 # -----------------------------------------------------------------
-#  EXISTING SEPARATION & ENHANCEMENT FUNCTIONS (WITH FIXES)
+#  EXISTING SEPARATION & ENHANCEMENT FUNCTIONS (Unchanged)
 # -----------------------------------------------------------------
 
 def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_threshold_db: int = 30):
+    # ... (This function is unchanged) ...
     try:
         y, sr = librosa.load(input_file, sr=None)
         y_trimmed, index = librosa.effects.trim(y, top_db=silence_threshold_db)
@@ -126,6 +148,14 @@ def enhance_audio(input_file, output_file, enhancement_type="vocals", silence_th
     except Exception as e:
         print(f" Audio enhancement error: {e}")
         return False
+
+# ... (All other functions: _get_enhancement_map, _run_demucs, 
+# ...  separate_audio_ultra, _separate_4_components, _separate_6_components,
+# ...  _separate_8_components, enhance_4_components, enhance_6_components,
+# ...  enhance_8_components, create_6_component_structure, _copy_and_log,
+# ...  create_8_component_structure_direct, get_separation_results,
+# ...  _print_component_info, print_ultra_components_info, main
+# ...  are all unchanged and correct.) ...
 
 def _get_enhancement_map():
     return {
@@ -388,6 +418,7 @@ def create_8_component_structure_direct(track_dir, output_dir, base_name, model_
         _copy_and_log(src_path, dst_path)
 
 def get_separation_results(input_file, output_dir, components, model):
+    # ... (This function is unchanged) ...
     base_name = Path(input_file).stem
     results = []
     
@@ -421,6 +452,7 @@ def get_separation_results(input_file, output_dir, components, model):
 
 
 def _print_component_info(track_dir, emoji, description, filename):
+    # ... (This function is unchanged) ...
     file_path = os.path.join(track_dir, filename)
     
     print(f"{emoji} - {description}")
@@ -431,6 +463,7 @@ def _print_component_info(track_dir, emoji, description, filename):
         print(f"     {filename} (File not found)")
 
 def print_ultra_components_info(input_file, output_dir, components, model):
+    # ... (This function is unchanged) ...
     base_name = Path(input_file).stem
     
     print("\n" + "=" * 70)
@@ -485,14 +518,8 @@ def print_ultra_components_info(input_file, output_dir, components, model):
 def main():
     parser = argparse.ArgumentParser(description="Ultra-Enhanced Music Source Separation with Audio Enhancement")
     main.parser = parser
-
-    parser.add_argument("input", help="Input audio file")
-    # ... (rest of main function is unchanged and correct) ...
-    
+    # ... (rest of main function is unchanged) ...
     args = parser.parse_args()
-    
-    # ... (rest of main function is unchanged and correct) ...
-    
     for _ in separate_audio_ultra(
         args.input, 
         args.output, 
@@ -504,7 +531,6 @@ def main():
         progress_callback=print
     ):
         pass
-    
     print("\n Separation process finished.")
 
 main.parser = None

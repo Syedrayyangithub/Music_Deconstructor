@@ -8,23 +8,23 @@ import shutil
 # Import the core separation function from your script
 from music_separator import (
     separate_audio_ultra, get_separation_results, ACTIVE_PROCESSES,
-    get_bpm, time_stretch_audio, fuse_stems # <-- NEW IMPORTS
+    get_bpm, time_stretch_audio, fuse_stems # <-- fuse_stems is updated
 )
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'output_demucs'
-TEMP_FOLDER = 'temp_fusion' # <-- NEW FOLDER FOR STRETCHED FILES
+TEMP_FOLDER = 'temp_fusion'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'flac', 'm4a', 'aac'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
-app.config['TEMP_FOLDER'] = TEMP_FOLDER # <-- NEW
+app.config['TEMP_FOLDER'] = TEMP_FOLDER
 app.secret_key = 'super_secret_key'
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs(TEMP_FOLDER, exist_ok=True) # <-- NEW
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -75,7 +75,6 @@ def process():
                 if progress_line:
                     yield progress_line
             
-            # Send back the unique filename AND the original filename
             yield f"data: SEPARATION_COMPLETE::{unique_filename}::{original_filename}\n\n"
             
         except Exception as e:
@@ -85,7 +84,9 @@ def process():
 
 @app.route('/results-for-file', methods=['POST'])
 def results_for_file():
-    # ... (This function is unchanged and correct) ...
+    # --- *** MODIFIED *** ---
+    # This route now renders the new song card partial.
+    
     data = request.get_json()
     unique_filename = data.get('unique_filename')
     original_filename = data.get('original_filename')
@@ -101,7 +102,7 @@ def results_for_file():
     
     # We pass the unique_filename to the partial template for the data attributes
     rendered_html = render_template(
-        'results_partial.html', 
+        'song_card_partial.html', # <-- NEW TEMPLATE NAME
         results=results, 
         filename=original_filename, 
         unique_filename=unique_filename,
@@ -111,15 +112,18 @@ def results_for_file():
     return jsonify({'html': rendered_html})
 
 # -----------------------------------------------------------------
-#  NEW FUSION ROUTE
+#  UPDATED FUSION ROUTE
 # -----------------------------------------------------------------
 @app.route('/fuse', methods=['POST'])
 def fuse_tracks():
+    # --- *** HEAVILY MODIFIED *** ---
+    # This route now parses the complex payload with volume/mute data
+    
     data = request.get_json()
-    fusion_map = data.get('fusion_map') # e.g., {"vocals": "uuid_song_a", "drums": "uuid_song_b", ...}
-    master_tempo_song_id = data.get('master_tempo_song_id') # e.g., "uuid_song_a"
-    model_map = data.get('model_map') # e.g., {"uuid_song_a": "htdemucs", ...}
-    components_map = data.get('components_map') # e.g., {"uuid_song_a": 4, ...}
+    fusion_map = data.get('fusion_map') # e.g., {"vocals": {"song_id": "...", "volume": 1.0, "is_muted": false}, ...}
+    master_tempo_song_id = data.get('master_tempo_song_id')
+    model_map = data.get('model_map')
+    components_map = data.get('components_map')
 
     # 1. Determine the Master BPM
     master_song_input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], master_tempo_song_id)
@@ -133,28 +137,33 @@ def fuse_tracks():
     print(f"--- STARTING FUSION ---")
     print(f"Master Tempo: {master_bpm} BPM (from {master_tempo_song_id})")
 
-    stems_to_fuse = [] # This will hold paths to the *stretched* stems
+    stems_to_fuse = [] # This will hold dicts: {"path": "...", "volume": 1.0}
     temp_dir = current_app.config['TEMP_FOLDER']
     
     # 2. Iterate, Stretch, and Collect Stems
-    for stem_name, song_id in fusion_map.items():
-        if not song_id: # Skip if user selected "None" for a stem
+    for stem_name, stem_data in fusion_map.items():
+        
+        # Get data from the new complex payload
+        song_id = stem_data.get("song_id")
+        volume = stem_data.get("volume", 1.0)
+        is_muted = stem_data.get("is_muted", False)
+
+        # Skip if user selected "None" or Muted the track
+        if not song_id or is_muted:
+            print(f"Skipping stem: {stem_name} (Muted or None)")
             continue
             
-        print(f"Processing stem: {stem_name} from song: {song_id}")
+        print(f"Processing stem: {stem_name} from song: {song_id} at volume {volume}")
         
         # Find the original (non-stretched) stem file
         model = model_map.get(song_id)
         components = components_map.get(song_id)
         
-        # This is a bit of a hack to re-create the stem path.
-        # We call get_separation_results just to find the one file we need.
         input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], song_id)
         all_stems = get_separation_results(input_path, current_app.config['OUTPUT_FOLDER'], components, model)
         
         original_stem_path = None
         for s in all_stems:
-            # s['name'] is "Vocals", stem_name is "vocals"
             if s['name'].lower() == stem_name:
                 original_stem_path = os.path.join(current_app.config['OUTPUT_FOLDER'], s['path'])
                 break
@@ -172,12 +181,16 @@ def fuse_tracks():
         else:
             time_stretch_audio(original_stem_path, stretched_stem_path, master_bpm)
         
-        stems_to_fuse.append(stretched_stem_path)
+        # Add a dict with path AND volume to the list
+        stems_to_fuse.append({
+            "path": stretched_stem_path,
+            "volume": volume
+        })
 
     if not stems_to_fuse:
         return jsonify({"error": "No stems were selected for fusion"}), 400
 
-    # 4. Fuse the stretched stems
+    # 4. Fuse the stretched stems (fuse_stems is now volume-aware)
     fused_filename = f"fused_{uuid.uuid4()}.mp3"
     fused_output_path_relative = os.path.join("fused_tracks", fused_filename)
     fused_output_path_full = os.path.join(current_app.config['OUTPUT_FOLDER'], fused_output_path_relative)
@@ -188,8 +201,8 @@ def fuse_tracks():
         return jsonify({"error": "Failed to fuse stems"}), 500
 
     # 5. Clean up temporary stretched files
-    for p in stems_to_fuse:
-        os.remove(p)
+    for stem_info in stems_to_fuse:
+        os.remove(stem_info["path"])
 
     print(f"--- FUSION COMPLETE ---")
     
@@ -200,7 +213,7 @@ def fuse_tracks():
     })
 
 # -----------------------------------------------------------------
-#  EXISTING ROUTES
+#  EXISTING ROUTES (Unchanged)
 # -----------------------------------------------------------------
 
 @app.route('/download/<path:filepath>')
@@ -209,17 +222,15 @@ def download_file(filepath):
 
 @app.route('/play/<path:filepath>')
 def play_file(filepath):
-    """Serves an audio file for in-browser playback."""
-    # We now serve from OUTPUT_FOLDER, which contains all stems AND fused tracks
     return send_from_directory(current_app.config['OUTPUT_FOLDER'], filepath)
 
 @app.route('/clear-files', methods=['POST'])
 def clear_files():
     upload_folder = current_app.config['UPLOAD_FOLDER']
     output_folder = current_app.config['OUTPUT_FOLDER']
-    temp_folder = current_app.config['TEMP_FOLDER'] # <-- NEW
+    temp_folder = current_app.config['TEMP_FOLDER']
     
-    folders_to_clear = [upload_folder, output_folder, temp_folder] # <-- NEW
+    folders_to_clear = [upload_folder, output_folder, temp_folder]
     
     for folder in folders_to_clear:
         if not os.path.exists(folder):
@@ -246,7 +257,6 @@ def clear_files():
 
 @app.route('/cancel', methods=['POST'])
 def cancel_process():
-    # ... (This function is unchanged and correct) ...
     last_file_info = session.get('last_file')
     if not last_file_info:
         return {"status": "error", "message": "No active job found in session."}, 404
